@@ -1,0 +1,13 @@
+**/.git
+**/.gitignore
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/publish
+**/venv
+**/.env
+**/__pycache__
+**/*.pyc
+python-engine/models/
+src/RoK.Ocr.Api/wwwroot/uploads/*

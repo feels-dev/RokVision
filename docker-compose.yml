@@ -1,0 +1,45 @@
+services:
+  # --- Python Service (OCR Engine - The Muscle) ---
+  ocr-engine:
+    build:
+      context: ./python-engine
+      dockerfile: Dockerfile
+    container_name: rok-ocr-engine
+    ports:
+      - "8000:8000"
+    environment:
+      # 🚀 PERFORMANCE CONFIGURATION (Where the magic happens)
+      - OCR_USE_GPU=false        # Change to 'true' if you have an NVIDIA GPU
+      - OCR_ENABLE_MKLDNN=true   # MANDATORY for CPU (Makes it up to 3x faster)
+      - OCR_CPU_THREADS=4        # Limits core usage (prevents the system from hanging)
+      - OCR_VERSION=PP-OCRv4     # Ensures the use of the latest/fastest model
+    volumes:
+      # Shares the uploads folder (Required for the Magnifier tool)
+      - shared-uploads:/app/wwwroot/uploads
+      # Saves AI models locally to avoid re-downloading every time (Cache)
+      - paddle-models:/root/.paddleocr
+    restart: always
+
+  # --- .NET Service (API Gateway - The Brain) ---
+  ocr-api:
+    build:
+      context: .
+      dockerfile: src/RoK.Ocr.Api/Dockerfile
+    container_name: rok-ocr-api
+    ports:
+      - "5000:8080" # Access via http://localhost:5000
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      # Internal address of the Python container
+      - PythonServiceUrl=http://ocr-engine:8000/
+    volumes:
+      # Shares the uploads folder with the Python service
+      - shared-uploads:/app/wwwroot/uploads
+    depends_on:
+      - ocr-engine
+    restart: always
+
+# --- Persistent Volumes ---
+volumes:
+  shared-uploads:
+  paddle-models:

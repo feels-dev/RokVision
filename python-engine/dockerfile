@@ -1,0 +1,32 @@
+# Usamos Python 3.10 (O mais estável para IA/Paddle)
+FROM python:3.10-slim
+
+# Instala dependências de sistema necessárias para o OpenCV e Paddle
+# Adicionamos 'libgl1' para corrigir o erro do libGL.so.1
+RUN apt-get update && apt-get install -y \
+    libgomp1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgl1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copia os requisitos e instala
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir --default-timeout=1000 -r requirements.txt
+
+# Copia o código fonte
+COPY main.py .
+
+# Cria a pasta onde as imagens serão montadas
+RUN mkdir -p /app/wwwroot/uploads
+
+# Expõe a porta 8000
+EXPOSE 8000
+
+# Comando para rodar
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
