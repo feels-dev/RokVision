@@ -98,7 +98,7 @@ Tests performed on a standard server **without GPU** (CPU Only with MKLDNN enabl
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/FelipeLuizDev/RokVision.Api.git
+    git clone https://github.com/feels-dev/RoKVision.git
     cd RokVision.Api
     ```
 
