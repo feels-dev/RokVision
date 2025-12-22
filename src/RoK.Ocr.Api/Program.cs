@@ -1,7 +1,10 @@
 using RoK.Ocr.Application.Cognitive;
 using RoK.Ocr.Application.Magnifier;
+using RoK.Ocr.Application.Reports.Magnifier;
+using RoK.Ocr.Application.Reports.Services;
 using RoK.Ocr.Application.Services;
 using RoK.Ocr.Domain.Interfaces;
+using RoK.Ocr.Infrastructure.Persistence;
 using RoK.Ocr.Infrastructure.PythonEngine;
 using RoK.Ocr.Infrastructure.Storage;
 
@@ -12,6 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHealthChecks();
 
 // Infrastructure: Image Storage
 // Sets the base path as the API root (where the wwwroot folder is located)
@@ -27,9 +31,19 @@ builder.Services.AddHttpClient<IOcrService, PythonOcrService>(client =>
     client.Timeout = TimeSpan.FromSeconds(30); // Generous timeout for heavy OCR processing
 });
 
+// FIX CS7036: Added the Logger retrieval from the ServiceProvider (sp)
+builder.Services.AddSingleton<IVocabularyLoader>(sp =>
+    new VocabularyLoader(
+        builder.Environment.ContentRootPath,
+        sp.GetRequiredService<ILogger<VocabularyLoader>>()
+    ));
+
 // Application: Core Services
 builder.Services.AddScoped<TheMagnifier>();
 builder.Services.AddScoped<OcrOrchestrator>();
+
+builder.Services.AddScoped<WarMagnifier>();
+builder.Services.AddScoped<ReportOrchestrator>();
 
 var app = builder.Build();
 
@@ -49,4 +63,5 @@ app.UseStaticFiles();
 app.UseAuthorization();
 app.MapControllers();
 
+app.MapHealthChecks("/health");
 app.Run();

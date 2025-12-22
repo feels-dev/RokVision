@@ -4,9 +4,15 @@ namespace RoK.Ocr.Domain.Models;
 
 public class AnalyzedBlock
 {
-    public OcrBlock Raw { get; set; } // The original OCR block (Text + Box)
-    public BlockType Type { get; set; } = BlockType.Unknown;
+    public required OcrBlock Raw { get; set; } 
     
-    // Shortcut to facilitate distance calculations
+    public BlockType Type { get; set; } = BlockType.Unknown;
+    public double CanvasWidth { get; set; }
+    public double CanvasHeight { get; set; }
     public (double X, double Y) Center => Raw.Center;
+
+    public (double X, double Y) NormalizedCenter => (
+        CanvasWidth > 0 ? Raw.Center.X / CanvasWidth : Raw.Center.X,
+        CanvasHeight > 0 ? Raw.Center.Y / CanvasHeight : Raw.Center.Y
+    );
 }

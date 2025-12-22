@@ -8,16 +8,27 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # 🚀 PERFORMANCE CONFIGURATION (Where the magic happens)
-      - OCR_USE_GPU=false        # Change to 'true' if you have an NVIDIA GPU
-      - OCR_ENABLE_MKLDNN=true   # MANDATORY for CPU (Makes it up to 3x faster)
-      - OCR_CPU_THREADS=4        # Limits core usage (prevents the system from hanging)
-      - OCR_VERSION=PP-OCRv4     # Ensures the use of the latest/fastest model
+      # 🚀 PERFORMANCE CONFIGURATION
+      - OCR_USE_GPU=false        # Change to 'true' if you have an NVIDIA GPU with drivers installed
+      - OCR_ENABLE_MKLDNN=true   # Essential for CPU performance on Intel/AMD
+      - OCR_CPU_THREADS=4        # Adjust according to the number of processor cores
+      - OCR_VERSION=PP-OCRv4     
     volumes:
-      # Shares the uploads folder (Required for the Magnifier tool)
+      # Shared volume so Magnifier (C#) and OCR (Python) can access the same images
       - shared-uploads:/app/wwwroot/uploads
-      # Saves AI models locally to avoid re-downloading every time (Cache)
+      # AI models cache (avoids download on boot)
       - paddle-models:/root/.paddleocr
+    
+    # --- HEALTH STRATEGY ---
+    # Checks if FastAPI is up and models are loaded.
+    # Since 'ch' model download is slow, start_period is high.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s       # Checks every 10 seconds
+      timeout: 5s         # Waits 5 seconds for response
+      retries: 30         # Tries 30 times before marking as failed (totaling ~5 min wait)
+      start_period: 60s   # Gives 1 minute total grace period before counting failures
+    
     restart: always
 
   # --- .NET Service (API Gateway - The Brain) ---
@@ -27,16 +38,21 @@ services:
       dockerfile: src/RoK.Ocr.Api/Dockerfile
     container_name: rok-ocr-api
     ports:
-      - "5000:8080" # Access via http://localhost:5000
+      - "5000:8080" # External access via http://localhost:5000
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      # Internal address of the Python container
+      # Internal Python container address (Docker DNS)
       - PythonServiceUrl=http://ocr-engine:8000/
     volumes:
-      # Shares the uploads folder with the Python service
+      # C# also needs to read/write to the shared volume
       - shared-uploads:/app/wwwroot/uploads
+    
+    # --- SMART DEPENDENCY ---
+    # C# now waits for ocr-engine to be HEALTHY (not just running)
     depends_on:
-      - ocr-engine
+      ocr-engine:
+        condition: service_healthy
+        
     restart: always
 
 # --- Persistent Volumes ---

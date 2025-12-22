@@ -1,0 +1,95 @@
+[
+    {
+        "id": "calvin",
+        "canonicalName": "Calvin",
+        "rarity": "Elite",
+        "expertise": "NPC",
+        "labels": [
+            "Calvin",
+            "Calvino",
+            "Calvin Barbarian",
+            "C4lvin",
+            "Calv1n",
+            "Calvin[Barbarians]",
+            "卡尔文",
+            "卡爾文",
+            "Calvinho",
+            "Calvín",
+            "Calvain",
+            "Kalvin"
+        ]
+    },
+    {
+        "id": "kranitos",
+        "canonicalName": "Kranitos",
+        "rarity": "Elite",
+        "expertise": "NPC",
+        "labels": [
+            "Kranitos",
+            "Kranit0s",
+            "Kranit",
+            "Kr4nitos",
+            "Kranitus",
+            "克兰尼托斯",
+            "克蘭尼托斯",
+            "Cranitos",
+            "Kranitós",
+            "Kraniteaux"
+        ]
+    },
+    {
+        "id": "barbarian_generic",
+        "canonicalName": "Barbarian",
+        "rarity": "Common",
+        "expertise": "NPC",
+        "labels": [
+            "Barbarian",
+            "Bárbaro",
+            "Barbaros",
+            "Barb4rian",
+            "B4rbaro",
+            "野蛮人",
+            "野蠻人",
+            "Barbariano",
+            "Barbare",
+            "Barbar"
+        ]
+    },
+    {
+        "id": "baulur",
+        "canonicalName": "Baulur",
+        "rarity": "Elite",
+        "expertise": "NPC",
+        "labels": [
+            "Baulur",
+            "Ironhand Baulur",
+            "IronhandBaulur",
+            "B4ulur",
+            "Baular",
+            "Iron Baulur",
+            "鲍卢尔",
+            "鮑盧爾",
+            "Bauluro",
+            "Baulúr",
+            "Bauleur"
+        ]
+    },
+    {
+        "id": "buffalo_drummer",
+        "canonicalName": "Buffalo Drummer",
+        "rarity": "Elite",
+        "expertise": "NPC",
+        "labels": [
+            "Buffalo Drummer",
+            "BuffaloDrummer",
+            "Buffalo D",
+            "Drummer",
+            "Buff4lo Drummer",
+            "布法罗鼓手",
+            "布法羅鼓手",
+            "Búfalo Baterista",
+            "Tamborilero Búfalo",
+            "Büffel Trommler"
+        ]
+    }
+]

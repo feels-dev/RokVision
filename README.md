@@ -4,7 +4,7 @@
 
 ![Badge](https://img.shields.io/badge/.NET-9.0-purple?style=for-the-badge&logo=dotnet)
 ![Badge](https://img.shields.io/badge/Python-3.10-blue?style=for-the-badge&logo=python)
-![Badge](https://img.shields.io/badge/PaddleOCR-v2.7-green?style=for-the-badge)
+![Badge](https://img.shields.io/badge/PaddleOCR-v4-green?style=for-the-badge)
 ![Badge](https://img.shields.io/badge/Docker-Microservices-2496ED?style=for-the-badge&logo=docker)
 ![Badge](https://img.shields.io/badge/License-MIT-orange?style=for-the-badge)
 
@@ -13,9 +13,10 @@
 <p align="center">
   <a href="#-key-features">Key Features</a> •
   <a href="#-architecture">Architecture</a> •
-  <a href="#-benchmarks">Benchmarks</a> •
   <a href="#-getting-started">Getting Started</a> •
-  <a href="#-api-usage">API Usage</a>
+  <a href="#-api-usage">API Usage</a> •
+  <a href="ROADMAP.md">Roadmap</a> •
+  <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
 </div>
@@ -24,111 +25,51 @@
 
 ## 📖 Overview
 
-**RoK Vision** is a high-performance, enterprise-grade **Cognitive OCR API** designed to extract governor statistics from *Rise of Kingdoms* screenshots with **100% precision** and **sub-second latency**.
-
-Unlike traditional bots (like Roktracker) that rely on fixed coordinates and fragile screen scraping, Vision uses **Deep Learning (PaddleOCR)** combined with a **C# Cognitive Orchestrator** to understand image context. This makes it resolution-independent and resilient to UI changes.
+**RoK Vision** is a high-performance **Cognitive OCR API** designed to transform *Rise of Kingdoms* screenshots into structured data. By combining **Deep Learning (PaddleOCR)** with a **Topological C# Orchestrator**, Vision understands the context of the screen, making it resolution-independent and extremely resilient to UI variations.
 
 ---
 
 ## 🚀 Key Features
 
-*   **🧠 Cognitive Orchestration**
-    It doesn't just read text; it "thinks". Using specialized Neurons and Anchor logic, it locates data based on semantic proximity (e.g., finding the Power number *near* the word "Power").
-
+*   **👤 Governor Profiles**
+    Extracts ID, Name, Power, Kill Points, and Civilization from the profile screen with sub-second latency.
+*   **⚔️ Battle Intelligence**
+    Full analysis of PvP and PvE reports, including troop metrics (Dead, Wounded, Remaining), casualty rates, and boss identification.
+*   **📐 Warp & Isolate**
+    Automatically detects the report container, removes city background noise, and applies perspective correction for a "flat paper" read.
+*   **📈 Dynamic Confidence**
+    A self-auditing logic that calculates accuracy based on mathematical consistency (Total Units + Heal = Losses).
 *   **🔍 The Magnifier (Auto-Healing)**
-    If the initial OCR scan fails or yields low confidence, the API automatically crops, applies filters (threshold/invert), and re-scans specific regions in parallel.
-
-*   **⚡ Extreme Performance**
-    *   **In-Memory Processing:** Zero disk I/O for requests (Direct RAM transfer).
-    *   **Smart Downscaling:** Automatically optimizes 4K/2K images to 1080p for 4x faster processing without precision loss.
-    *   **Hardware Agnostic:** Auto-configures for **NVIDIA GPUs** (CUDA) or optimized **CPU Vectorization** (MKLDNN).
-
-*   **🌐 Resolution & Language Agnostic**
-    Works with 720p, 1080p, 4K, Ultrawide, Mobile, and Tablet screenshots. Supports multiple in-game languages (EN, PT, CN, KR, RU, etc.).
-
-*   **🐳 Docker Native**
-    Fully containerized microservices architecture ready for horizontal scaling (Kubernetes/Swarm).
+    Automatic regional re-scanning with specialized digital filters for low-confidence areas.
+*   **🌐 Multicultural Core**
+    Optimized for Latin alphabets (EN, PT, ES, FR, DE) with smart detection of unsupported characters.
 
 ---
 
 ## 🏗️ Architecture
 
-The solution follows a distributed architecture separating the "Brain" from the "Muscle":
+The solution follows a distributed architecture: the **Muscle** (Python) handles the heavy AI computer vision, while the **Brain** (C#) manages the logical orchestration.
 
 ```mermaid
 graph LR
-    User["Client / Bot"] -->|"POST Image (Base64/Multipart)"| API["API Gateway (.NET 9)"]
-    
+    User["Client / Bot"] -->|"POST"| API["API Gateway (.NET 9)"]
     subgraph "The Brain (.NET 9)"
-        API --> Logic[Smart Downscaling]
-        Logic --> Orchestrator[Cognitive Orchestrator]
+        API --> Orchestrator[Cognitive Orchestrator]
         Orchestrator --> Neurons[Specialized Neurons]
-        Neurons --> Magnifier[The Magnifier Engine]
+        Neurons --> Magnifier[The Magnifier]
     end
-    
     subgraph "The Muscle (Python)"
-        Orchestrator -->|"Request via HTTP"| OCR[PaddleOCR Engine]
-        OCR -->|"Raw Blocks + Coordinates"| Orchestrator
+        Orchestrator -->|"gRPC/HTTP"| OCR[PaddleOCR Engine]
     end
 ```
-
----
-
-## 📊 Benchmarks
-
-Tests performed on a standard server **without GPU** (CPU Only with MKLDNN enabled).
-
-| Scenario | Resolution | Original Time | **Vision Optimized** | Precision |
-| :--- | :--- | :--- | :--- | :--- |
-| **4K Screenshot** | 3840x2160 | ~2.00s | **1.00s** | 100% |
-| **Profile (Standard)** | 1600x900 | 1.32s | **0.89s** | 100% |
-| **City View (Noisy)** | 1920x1080 | 1.26s | **0.66s** | 100% |
-| **Cropped Stats** | Custom | 0.88s | **0.58s** | 100% |
-
-> **🚀 Pro Tip:** With an NVIDIA GPU enabled, expected latency drops to **< 0.1s**.
-
----
-
-## 🛠️ Getting Started
-
-### Prerequisites
-*   [Docker](https://www.docker.com/) & Docker Compose
-
-### Installation
-
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/feels-dev/RoKVision.git
-    cd RokVision.Api
-    ```
-
-2.  **Configure Hardware Acceleration** in `docker-compose.yml`:
-    *   **For CPU Only (Standard):** Set `OCR_USE_GPU=false` and `OCR_ENABLE_MKLDNN=true`.
-    *   **For NVIDIA GPU:** Set `OCR_USE_GPU=true`.
-
-3.  **Build and Run:**
-    ```bash
-    docker-compose up --build -d
-    ```
-
-4.  **Access the API Documentation (Swagger):**
-    *   Navigate to: `http://localhost:5000/swagger`
 
 ---
 
 ## 🔌 API Usage
 
-### Endpoint: `POST /api/ocr/analyze`
-
-Accepts an image file (`multipart/form-data`) or Base64 string.
-
-#### Request (cURL)
-```bash
-curl -X POST "http://localhost:5000/api/ocr/analyze" \
-     -H "accept: */*" \
-     -H "Content-Type: multipart/form-data" \
-     -F "Image=@/path/to/screenshot.png"
-```
+### 1. Governor Profile
+`POST /api/governor/analyze`  
+Extracts statistics from the governor's profile screen.
 
 #### Response (JSON)
 ```json
@@ -149,43 +90,48 @@ curl -X POST "http://localhost:5000/api/ocr/analyze" \
 }
 ```
 
----
+### 2. Battle Reports
+`POST /api/reports/analyze`  
+Analyzes complex battle logs, identifying if the target is a Player or NPC.
 
-## ⚙️ Configuration
-
-Environment variables located in `docker-compose.yml`:
-
-| Variable | Service | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `OCR_USE_GPU` | Python | `false` | Set `true` if NVIDIA GPU is available. |
-| `OCR_ENABLE_MKLDNN` | Python | `true` | Enables Intel/AMD math acceleration (Vital for CPU). |
-| `OCR_CPU_THREADS` | Python | `4` | Number of threads for OCR math operations. |
-| `OCR_VERSION` | Python | `PP-OCRv4` | PaddleOCR model version (Mobile/Server). |
-
----
-
-## ⚖️ Legal Disclaimer
-
-**RoK Vision API** is a strictly passive image processing tool. 
-*   It **does not** interact with the game client or memory.
-*   It **does not** inject code.
-*   It **does not** automate gameplay actions (macros).
-
-It processes static image files uploaded by the user. The developers are not responsible for how end-users acquire the screenshots or use the extracted data.
+#### Sample Response (Battle Report)
+```json
+{
+  "success": true,
+  "overallConfidence": 99.5,
+  "data": {
+    "type": "Barbarian",
+    "attacker": { "governorName": "ml Feels", "totalUnits": 7302, "dead": 0 },
+    "defender": { 
+        "isNpc": true, 
+        "governorName": "Lv. 10 Barbarian", 
+        "pveStats": { "damageReceivedPercentage": 43.2 } 
+    }
+  }
+}
+```
 
 ---
 
-## 🤝 Contributing
-
-Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
+## 📸 Best Practices
+To ensure **>95% accuracy**, follow the "Golden Screenshot" rules:
+1. **Full Screen:** Send original screenshots. Do not crop the image manually.
+2. **No Overlays:** Close the chat, notification bubbles, or side menus before capturing.
+3. **Brightness:** Use standard in-game brightness for optimal contrast.
 
 ---
-
-### 📝 License
-
-Distributed under the MIT License. See LICENSE for more information.
 
 ## Support the Project
 If RoKVision helps your alliance, consider buying me a coffee! ☕
 - Pix: 031c9e65-66a3-4611-822b-796e227e200a
 - Ko-fi: [link]
+
+---
+
+## 🤝 Contributing
+See our [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to help the project.
+
+Pull requests are welcome! For major changes, please open an issue first.
+
+### 📝 License
+Distributed under the MIT License. See `LICENSE` for more information.

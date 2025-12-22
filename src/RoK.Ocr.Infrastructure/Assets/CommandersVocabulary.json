@@ -1,0 +1,1712 @@
+[
+  {
+    "id": "scipio_prime",
+    "canonicalName": "Scipio Africanus (Prime)",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Scipio Africanus",
+      "Scipio Prime",
+      "Scipio P",
+      "Scip1o",
+      "P. Scipio",
+      "大西庇阿",
+      "Scipio (P)",
+      "ScipioA"
+    ]
+  },
+  {
+    "id": "scipio_old",
+    "canonicalName": "Scipio Africanus",
+    "rarity": "Epic",
+    "expertise": "Leadership",
+    "labels": [
+      "Scipio Africanus",
+      "Scipio",
+      "Scipione",
+      "Africanus"
+    ]
+  },
+  {
+    "id": "liuche",
+    "canonicalName": "Liu Che",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Liu Che",
+      "LiuChe",
+      "Liu-Che",
+      "L1u Che",
+      "L1uChe",
+      "刘彻",
+      "劉徹",
+      "Emperor Wu",
+      "Wudi"
+    ]
+  },
+  {
+    "id": "zhugeliang",
+    "canonicalName": "Zhuge Liang",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Zhuge Liang",
+      "Zhuge",
+      "Liang",
+      "Zhu ge",
+      "Kongming",
+      "诸葛亮",
+      "諸葛亮",
+      "ZGL",
+      "Zhug"
+    ]
+  },
+  {
+    "id": "hermann_prime",
+    "canonicalName": "Hermann (Prime)",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Hermann (Prime)",
+      "Hermann Prime",
+      "Hermann P",
+      "Prime Hermann",
+      "Arminius"
+    ]
+  },
+  {
+    "id": "hermann_old",
+    "canonicalName": "Hermann",
+    "rarity": "Epic",
+    "expertise": "Archer",
+    "labels": [
+      "Hermann",
+      "Herrmann",
+      "Herman"
+    ]
+  },
+  {
+    "id": "joan_prime",
+    "canonicalName": "Joan of Arc (Prime)",
+    "rarity": "Legendary",
+    "expertise": "Support",
+    "labels": [
+      "Joan of Arc (Prime)",
+      "Joan Prime",
+      "Joan P",
+      "JoanP",
+      "Jeanne d'Arc (P)",
+      "Jeanne P",
+      "贞德",
+      "貞德",
+      "J0an"
+    ]
+  },
+  {
+    "id": "joan_old",
+    "canonicalName": "Joan of Arc",
+    "rarity": "Epic",
+    "expertise": "Integration",
+    "labels": [
+      "Joan of Arc",
+      "Joan",
+      "Joana d'Arc",
+      "Jeanne d'Arc",
+      "Jeanne"
+    ]
+  },
+  {
+    "id": "huoqubing",
+    "canonicalName": "Huo Qubing",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Huo Qubing",
+      "HuoQubing",
+      "Huo",
+      "HQB",
+      "Hu0",
+      "霍去病",
+      "Qubing"
+    ]
+  },
+  {
+    "id": "nevsky",
+    "canonicalName": "Alexander Nevsky",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Alexander Nevsky",
+      "Nevsky",
+      "Nevski",
+      "Newsky",
+      "Nev",
+      "Александр Невский",
+      "Невский"
+    ]
+  },
+  {
+    "id": "boudica_prime",
+    "canonicalName": "Boudica (Prime)",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Boudica (Prime)",
+      "Boudica Prime",
+      "Boudica P",
+      "Boudicca Prime",
+      "Boud1ca",
+      "Boadecia P"
+    ]
+  },
+  {
+    "id": "boudica_old",
+    "canonicalName": "Boudica",
+    "rarity": "Epic",
+    "expertise": "Integration",
+    "labels": [
+      "Boudica",
+      "Boudicca",
+      "B0udica",
+      "Boudic",
+      "Boadiceia"
+    ]
+  },
+  {
+    "id": "guanyu",
+    "canonicalName": "Guan Yu",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Guan Yu",
+      "GuanYu",
+      "Guan",
+      "Gu4n",
+      "Saint of War",
+      "关羽",
+      "關羽"
+    ]
+  },
+  {
+    "id": "ashurbanipal",
+    "canonicalName": "Ashurbanipal",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Ashurbanipal",
+      "Ashur",
+      "Ashurban",
+      "Aššurbanipal",
+      "亞述巴尼拔"
+    ]
+  },
+  {
+    "id": "wallace",
+    "canonicalName": "William Wallace",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "William Wallace",
+      "Wallace",
+      "W. Wallace",
+      "Will Wallace",
+      "Braveheart"
+    ]
+  },
+  {
+    "id": "gorgo",
+    "canonicalName": "Gorgo",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Gorgo",
+      "G0rgo",
+      "Queen Gorgo",
+      "戈尔GW",
+      "戈耳G"
+    ]
+  },
+  {
+    "id": "justinian",
+    "canonicalName": "Justinian I",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Justinian I",
+      "Justinian",
+      "Justinianus",
+      "Just1nian",
+      "查士丁尼"
+    ]
+  },
+  {
+    "id": "xiangyu",
+    "canonicalName": "Xiang Yu",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Xiang Yu",
+      "XiangYu",
+      "XY",
+      "X.Y.",
+      "Xiang",
+      "项羽",
+      "項羽"
+    ]
+  },
+  {
+    "id": "henry",
+    "canonicalName": "Henry V",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Henry V",
+      "Henry",
+      "Henri V",
+      "Henrique V",
+      "Henr7",
+      "Henry5"
+    ]
+  },
+  {
+    "id": "ysg",
+    "canonicalName": "Yi Seong-Gye",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Yi Seong-Gye",
+      "YSG",
+      "Yi Seong",
+      "Seong-Gye",
+      "SeongGye",
+      "李成桂",
+      "이성계"
+    ]
+  },
+  {
+    "id": "minamoto",
+    "canonicalName": "Minamoto no Yoshitsune",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Minamoto no Yoshitsune",
+      "Minamoto",
+      "M1namoto",
+      "Minam0to",
+      "Yoshitsune",
+      "Y0shitsune",
+      "Mina",
+      "源義経",
+      "源义经",
+      "Moneymoto"
+    ]
+  },
+  {
+    "id": "caocao",
+    "canonicalName": "Cao Cao",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Cao Cao",
+      "CaoCao",
+      "Cao",
+      "CC",
+      "C00",
+      "Mengde",
+      "曹操"
+    ]
+  },
+  {
+    "id": "suntzu",
+    "canonicalName": "Sun Tzu",
+    "rarity": "Epic",
+    "expertise": "Infantry",
+    "labels": [
+      "Sun Tzu",
+      "SunTzu",
+      "Sun Tsu",
+      "Sun Zi",
+      "5un Tzu",
+      "Suntzu",
+      "SunTzu",
+      "孙武",
+      "孫武"
+    ]
+  },
+  {
+    "id": "aethelflaed",
+    "canonicalName": "Aethelflaed",
+    "rarity": "Legendary",
+    "expertise": "Leadership",
+    "labels": [
+      "Aethelflaed",
+      "Aethel",
+      "Aeth",
+      "Æthelflæd",
+      "Aethelfled",
+      "埃塞尔弗Qw"
+    ]
+  },
+  {
+    "id": "alexander",
+    "canonicalName": "Alexander the Great",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Alexander the Great",
+      "Alexander",
+      "Alex",
+      "Alexandre",
+      "Alejandro",
+      "ATG",
+      "亚历山大",
+      "Alexandr"
+    ]
+  },
+  {
+    "id": "martel",
+    "canonicalName": "Charles Martel",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Charles Martel",
+      "Martel",
+      "Charles",
+      "Martcl",
+      "CM",
+      "查理马特"
+    ]
+  },
+  {
+    "id": "richard",
+    "canonicalName": "Richard I",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Richard I",
+      "Richard",
+      "Ricardo",
+      "R1chard",
+      "Rich",
+      "Lionheart",
+      "理查一世"
+    ]
+  },
+  {
+    "id": "saladin",
+    "canonicalName": "Saladin",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Saladin",
+      "Salah ad-Din",
+      "Salad1n",
+      "Saladino",
+      "萨拉丁"
+    ]
+  },
+  {
+    "id": "constantine",
+    "canonicalName": "Constantine I",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Constantine I",
+      "Constantine",
+      "Const",
+      "Costantino",
+      "君士坦丁"
+    ]
+  },
+  {
+    "id": "attila",
+    "canonicalName": "Attila",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Attila",
+      "Atilla",
+      "Att1la",
+      "阿提拉"
+    ]
+  },
+  {
+    "id": "takeda",
+    "canonicalName": "Takeda Shingen",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Takeda Shingen",
+      "Takeda",
+      "Shingen",
+      "武田信玄"
+    ]
+  },
+  {
+    "id": "honda",
+    "canonicalName": "Honda Tadakatsu",
+    "rarity": "Legendary",
+    "expertise": "Integration",
+    "labels": [
+      "Honda Tadakatsu",
+      "Honda",
+      "Tadakatsu",
+      "H0nda",
+      "本多忠勝"
+    ]
+  },
+  {
+    "id": "william_i",
+    "canonicalName": "William I",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "William I",
+      "William",
+      "Will",
+      "Guilherme",
+      "威廉一世"
+    ]
+  },
+  {
+    "id": "nebuchadnezzar",
+    "canonicalName": "Nebuchadnezzar II",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Nebuchadnezzar II",
+      "Nebuchadnezzar",
+      "Nebu",
+      "Neb",
+      "Nabuco",
+      "尼布甲尼撒"
+    ]
+  },
+  {
+    "id": "gilgamesh",
+    "canonicalName": "Gilgamesh",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Gilgamesh",
+      "Gilga",
+      "Gilgy",
+      "G1lgamesh",
+      "吉尔伽美什"
+    ]
+  },
+  {
+    "id": "amanitore",
+    "canonicalName": "Amanitore",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Amanitore",
+      "Amani",
+      "AmaniTore",
+      "阿玛尼"
+    ]
+  },
+  {
+    "id": "artemisia",
+    "canonicalName": "Artemisia I",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Artemisia I",
+      "Artemisia",
+      "Arte",
+      "Artemis",
+      "阿尔特米西亚"
+    ]
+  },
+  {
+    "id": "ramses",
+    "canonicalName": "Ramesses II",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Ramesses II",
+      "Ramesses",
+      "Ramses",
+      "Ram",
+      "拉美西斯"
+    ]
+  },
+  {
+    "id": "cyrus",
+    "canonicalName": "Cyrus the Great",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Cyrus the Great",
+      "Cyrus",
+      "Ciro",
+      "居鲁士"
+    ]
+  },
+  {
+    "id": "tomoe",
+    "canonicalName": "Tomoe Gozen",
+    "rarity": "Elite",
+    "expertise": "Archer",
+    "labels": [
+      "Tomoe Gozen",
+      "Tomoe",
+      "Gozen",
+      "巴御前"
+    ]
+  },
+  {
+    "id": "kusunoki",
+    "canonicalName": "Kusunoki Masashige",
+    "rarity": "Epic",
+    "expertise": "Archer",
+    "labels": [
+      "Kusunoki Masashige",
+      "Kusunoki",
+      "Masashige",
+      "Kusu",
+      "楠木正成"
+    ]
+  },
+  {
+    "id": "ishida",
+    "canonicalName": "Ishida Mitsunari",
+    "rarity": "Legendary",
+    "expertise": "Gathering",
+    "labels": [
+      "Ishida Mitsunari",
+      "Ishida",
+      "Mitsunari",
+      "石田三成"
+    ]
+  },
+  {
+    "id": "seondeok",
+    "canonicalName": "Seondeok",
+    "rarity": "Legendary",
+    "expertise": "Gathering",
+    "labels": [
+      "Seondeok",
+      "Seon",
+      "Sondeok",
+      "善德女王",
+      "선덕여왕"
+    ]
+  },
+  {
+    "id": "cleopatra",
+    "canonicalName": "Cleopatra VII",
+    "rarity": "Legendary",
+    "expertise": "Gathering",
+    "labels": [
+      "Cleopatra VII",
+      "Cleopatra",
+      "Cleo",
+      "Cléo",
+      "克丽奥佩特拉"
+    ]
+  },
+  {
+    "id": "trajan",
+    "canonicalName": "Trajan",
+    "rarity": "Legendary",
+    "expertise": "Leadership",
+    "labels": [
+      "Trajan",
+      "Trajano",
+      "Trajanus",
+      "图拉真"
+    ]
+  },
+  {
+    "id": "harald",
+    "canonicalName": "Harald Sigurdsson",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Harald Sigurdsson",
+      "Harald",
+      "Harold",
+      "Sigurdsson",
+      "哈拉尔"
+    ]
+  },
+  {
+    "id": "pakal",
+    "canonicalName": "Pakal II",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Pakal II",
+      "Pakal",
+      "Pacal",
+      "帕卡尔"
+    ]
+  },
+  {
+    "id": "zenobia",
+    "canonicalName": "Zenobia",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Zenobia",
+      "Zeno",
+      "Zenob1a",
+      "芝诺比阿"
+    ]
+  },
+  {
+    "id": "flavius",
+    "canonicalName": "Flavius Aetius",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Flavius Aetius",
+      "Flavius",
+      "Aetius",
+      "弗拉维乌斯"
+    ]
+  },
+  {
+    "id": "sargon",
+    "canonicalName": "Sargon the Great",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Sargon the Great",
+      "Sargon",
+      "Sarg0n",
+      "萨尔贡"
+    ]
+  },
+  {
+    "id": "tariq",
+    "canonicalName": "Tariq ibn Ziyad",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Tariq ibn Ziyad",
+      "Tariq",
+      "Tarik",
+      "塔里克"
+    ]
+  },
+  {
+    "id": "margaret",
+    "canonicalName": "Margaret I",
+    "rarity": "Legendary",
+    "expertise": "Support",
+    "labels": [
+      "Margaret I",
+      "Margaret",
+      "Maggie",
+      "玛格丽特"
+    ]
+  },
+  {
+    "id": "babur",
+    "canonicalName": "Babur",
+    "rarity": "Legendary",
+    "expertise": "Siege",
+    "labels": [
+      "Babur",
+      "Babu",
+      "巴布尔"
+    ]
+  },
+  {
+    "id": "zizka",
+    "canonicalName": "Jan Zizka",
+    "rarity": "Legendary",
+    "expertise": "Siege",
+    "labels": [
+      "Jan Zizka",
+      "Zizka",
+      "Jan",
+      "扬·Žižka"
+    ]
+  },
+  {
+    "id": "bjorn",
+    "canonicalName": "Bjorn Ironside",
+    "rarity": "Epic",
+    "expertise": "Infantry",
+    "labels": [
+      "Bjorn Ironside",
+      "Bjorn",
+      "Ironside",
+      "Björn",
+      "比约恩"
+    ]
+  },
+  {
+    "id": "lohar",
+    "canonicalName": "Lohar",
+    "rarity": "Epic",
+    "expertise": "Peacekeeping",
+    "labels": [
+      "Lohar",
+      "L0har",
+      "Lohars",
+      "Lohar's",
+      "洛哈"
+    ]
+  },
+  {
+    "id": "pericles",
+    "canonicalName": "Pericles",
+    "rarity": "Epic",
+    "expertise": "Infantry",
+    "labels": [
+      "Pericles",
+      "Péricles",
+      "Perikles",
+      "Periclcs",
+      "伯里克利"
+    ]
+  },
+  {
+    "id": "eulji",
+    "canonicalName": "Eulji Mundeok",
+    "rarity": "Epic",
+    "expertise": "Infantry",
+    "labels": [
+      "Eulji Mundeok",
+      "Eulji",
+      "Mundeok",
+      "乙支文德",
+      "을지문덕"
+    ]
+  },
+  {
+    "id": "baibars",
+    "canonicalName": "Baibars",
+    "rarity": "Epic",
+    "expertise": "Cavalry",
+    "labels": [
+      "Baibars",
+      "Baybars",
+      "Ba1bars",
+      "拜巴尔"
+    ]
+  },
+  {
+    "id": "belisarius",
+    "canonicalName": "Belisarius",
+    "rarity": "Epic",
+    "expertise": "Cavalry",
+    "labels": [
+      "Belisarius",
+      "Beli",
+      "贝利撒留"
+    ]
+  },
+  {
+    "id": "pelagius",
+    "canonicalName": "Pelagius",
+    "rarity": "Epic",
+    "expertise": "Cavalry",
+    "labels": [
+      "Pelagius",
+      "Pelayo",
+      "Pela",
+      "佩拉约"
+    ]
+  },
+  {
+    "id": "osman",
+    "canonicalName": "Osman I",
+    "rarity": "Epic",
+    "expertise": "Leadership",
+    "labels": [
+      "Osman I",
+      "Osman",
+      "0sman",
+      "奥斯曼"
+    ]
+  },
+  {
+    "id": "mehmed",
+    "canonicalName": "Mehmed II",
+    "rarity": "Legendary",
+    "expertise": "Leadership",
+    "labels": [
+      "Mehmed II",
+      "Mehmed",
+      "Mehmet",
+      "Mehm",
+      "穆罕默德"
+    ]
+  },
+  {
+    "id": "frederick",
+    "canonicalName": "Frederick I",
+    "rarity": "Legendary",
+    "expertise": "Leadership",
+    "labels": [
+      "Frederick I",
+      "Frederick",
+      "Fred",
+      "Freddy",
+      "腓特烈"
+    ]
+  },
+  {
+    "id": "julius",
+    "canonicalName": "Julius Caesar",
+    "rarity": "Legendary",
+    "expertise": "Leadership",
+    "labels": [
+      "Julius Caesar",
+      "Caesar",
+      "J. Caesar",
+      "JC",
+      "凯撒"
+    ]
+  },
+  {
+    "id": "ragnar",
+    "canonicalName": "Ragnar Lodbrok",
+    "rarity": "Legendary",
+    "expertise": "Leadership",
+    "labels": [
+      "Ragnar Lodbrok",
+      "Ragnar",
+      "Lodbrok",
+      "拉格纳"
+    ]
+  },
+  {
+    "id": "edward",
+    "canonicalName": "Edward of Woodstock",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Edward of Woodstock",
+      "Edward",
+      "Woodstock",
+      "Black Prince",
+      "爱德华"
+    ]
+  },
+  {
+    "id": "tomyris",
+    "canonicalName": "Tomyris",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Tomyris",
+      "Tomy",
+      "Tomyres",
+      "托米丽司"
+    ]
+  },
+  {
+    "id": "wu_zetian",
+    "canonicalName": "Wu Zetian",
+    "rarity": "Legendary",
+    "expertise": "Support",
+    "labels": [
+      "Wu Zetian",
+      "WuZetian",
+      "Wu",
+      "武则天",
+      "武則天"
+    ]
+  },
+  {
+    "id": "genghis",
+    "canonicalName": "Genghis Khan",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Genghis Khan",
+      "Genghis",
+      "Khan",
+      "GK",
+      "成吉思汗"
+    ]
+  },
+  {
+    "id": "charlemagne",
+    "canonicalName": "Charlemagne",
+    "rarity": "Legendary",
+    "expertise": "Leadership",
+    "labels": [
+      "Charlemagne",
+      "Charles the Great",
+      "查理曼"
+    ]
+  },
+  {
+    "id": "mulan",
+    "canonicalName": "Mulan",
+    "rarity": "Legendary",
+    "expertise": "Integration",
+    "labels": [
+      "Mulan",
+      "Hua Mulan",
+      "花木兰"
+    ]
+  },
+  {
+    "id": "lu_bu",
+    "canonicalName": "Lu Bu",
+    "rarity": "Legendary",
+    "expertise": "Conquering",
+    "labels": [
+      "Lu Bu",
+      "LuBu",
+      "吕布"
+    ]
+  },
+  {
+    "id": "diaochan",
+    "canonicalName": "Diaochan",
+    "rarity": "Epic",
+    "expertise": "Support",
+    "labels": [
+      "Diaochan",
+      "Diao Chan",
+      "貂蝉"
+    ]
+  },
+  {
+    "id": "keira",
+    "canonicalName": "Keira",
+    "rarity": "Epic",
+    "expertise": "Archer",
+    "labels": [
+      "Keira",
+      "Kiera",
+      "凯拉"
+    ]
+  },
+  {
+    "id": "tamar",
+    "canonicalName": "Tamar of Georgia",
+    "rarity": "Epic",
+    "expertise": "Gathering",
+    "labels": [
+      "Tamar of Georgia",
+      "Tamar",
+      "塔玛尔"
+    ]
+  },
+  {
+    "id": "imhotep",
+    "canonicalName": "Imhotep",
+    "rarity": "Epic",
+    "expertise": "Archer",
+    "labels": [
+      "Imhotep",
+      "Imho",
+      "伊姆霍特普"
+    ]
+  },
+  {
+    "id": "thutmose",
+    "canonicalName": "Thutmose III",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Thutmose III",
+      "Thutmose",
+      "Thut",
+      "图特摩斯"
+    ]
+  },
+  {
+    "id": "pyrrhus",
+    "canonicalName": "Pyrrhus",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Pyrrhus",
+      "皮洛士"
+    ]
+  },
+  {
+    "id": "heraclius",
+    "canonicalName": "Heraclius",
+    "rarity": "Legendary",
+    "expertise": "Leadership",
+    "labels": [
+      "Heraclius",
+      "Herac",
+      "希拉克略"
+    ]
+  },
+  {
+    "id": "belisarius_prime",
+    "canonicalName": "Belisarius (Prime)",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Belisarius (Prime)",
+      "Belisarius P",
+      "Prime Belisarius"
+    ]
+  },
+  {
+    "id": "bayan",
+    "canonicalName": "Bayan",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Bayan",
+      "Baian",
+      "Bayan of the Baarin"
+    ]
+  },
+  {
+    "id": "fan_lihua",
+    "canonicalName": "Fan Lihua",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Fan Lihua",
+      "Fan",
+      "Lihua",
+      "樊梨花"
+    ]
+  },
+  {
+    "id": "viktor",
+    "canonicalName": "Viktor",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Viktor",
+      "Victor"
+    ]
+  },
+  {
+    "id": "sophronius",
+    "canonicalName": "Sophronius",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Sophronius",
+      "Sofronio"
+    ]
+  },
+  {
+    "id": "lachlan",
+    "canonicalName": "Lachlan Macquarie",
+    "rarity": "Legendary",
+    "expertise": "Engineering",
+    "labels": [
+      "Lachlan",
+      "Macquarie"
+    ]
+  },
+  {
+    "id": "anders",
+    "canonicalName": "Anders Lasson",
+    "rarity": "Legendary",
+    "expertise": "Engineering",
+    "labels": [
+      "Anders",
+      "Lasson"
+    ]
+  },
+  {
+    "id": "el_cid",
+    "canonicalName": "El Cid",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "El Cid",
+      "Cid"
+    ]
+  },
+  {
+    "id": "hannibal",
+    "canonicalName": "Hannibal Barca",
+    "rarity": "Legendary",
+    "expertise": "Leadership",
+    "labels": [
+      "Hannibal",
+      "Barca"
+    ]
+  },
+  {
+    "id": "leonidas",
+    "canonicalName": "Leonidas I",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Leonidas",
+      "Leo"
+    ]
+  },
+  {
+    "id": "yss",
+    "canonicalName": "Yi Sun-sin",
+    "rarity": "Legendary",
+    "expertise": "Garrison",
+    "labels": [
+      "Yi Sun-sin",
+      "YSS",
+      "Yi Sun Sin"
+    ]
+  },
+  {
+    "id": "theodora",
+    "canonicalName": "Theodora",
+    "rarity": "Legendary",
+    "expertise": "Garrison",
+    "labels": [
+      "Theodora",
+      "Theo"
+    ]
+  },
+  {
+    "id": "bertrand",
+    "canonicalName": "Bertrand du Guesclin",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Bertrand",
+      "Bert"
+    ]
+  },
+  {
+    "id": "chandragupta",
+    "canonicalName": "Chandragupta Maurya",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Chandragupta",
+      "Chandra",
+      "Maurya"
+    ]
+  },
+  {
+    "id": "suleiman",
+    "canonicalName": "Suleiman I",
+    "rarity": "Legendary",
+    "expertise": "Leadership",
+    "labels": [
+      "Suleiman",
+      "Suleiman the Magnificent"
+    ]
+  },
+  {
+    "id": "moctezuma",
+    "canonicalName": "Moctezuma I",
+    "rarity": "Legendary",
+    "expertise": "Leadership",
+    "labels": [
+      "Moctezuma",
+      "Montezuma"
+    ]
+  },
+  {
+    "id": "xerxes",
+    "canonicalName": "Xerxes I",
+    "rarity": "Legendary",
+    "expertise": "Garrison",
+    "labels": [
+      "Xerxes"
+    ]
+  },
+  {
+    "id": "cheok",
+    "canonicalName": "Cheok Jun-gyeong",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Cheok",
+      "Cheok Jun-gyeong",
+      "CJG"
+    ]
+  },
+  {
+    "id": "mathilda",
+    "canonicalName": "Matilda of Flanders",
+    "rarity": "Epic",
+    "expertise": "Gathering",
+    "labels": [
+      "Matilda",
+      "Mathilda"
+    ]
+  },
+  {
+    "id": "mochizuki",
+    "canonicalName": "Mochizuki Chiyo",
+    "rarity": "Epic",
+    "expertise": "Garrison",
+    "labels": [
+      "Chiyo",
+      "Mochizuki"
+    ]
+  },
+  {
+    "id": "constance",
+    "canonicalName": "Constance",
+    "rarity": "Elite",
+    "expertise": "Gathering",
+    "labels": [
+      "Constance",
+      "Konstanze"
+    ]
+  },
+  {
+    "id": "sarka",
+    "canonicalName": "Sarka",
+    "rarity": "Elite",
+    "expertise": "Gathering",
+    "labels": [
+      "Sarka",
+      "Šárka"
+    ]
+  },
+  {
+    "id": "gaius",
+    "canonicalName": "Gaius Marius",
+    "rarity": "Elite",
+    "expertise": "Gathering",
+    "labels": [
+      "Gaius",
+      "Marius"
+    ]
+  },
+  {
+    "id": "lancelot",
+    "canonicalName": "Lancelot",
+    "rarity": "Elite",
+    "expertise": "Cavalry",
+    "labels": [
+      "Lancelot"
+    ]
+  },
+  {
+    "id": "dragon_lancer",
+    "canonicalName": "Dragon Lancer",
+    "rarity": "Advanced",
+    "expertise": "Cavalry",
+    "labels": [
+      "Dragon Lancer",
+      "Lancer"
+    ]
+  },
+  {
+    "id": "city_keeper",
+    "canonicalName": "City Keeper",
+    "rarity": "Advanced",
+    "expertise": "Infantry",
+    "labels": [
+      "City Keeper",
+      "Keeper"
+    ]
+  },
+  {
+    "id": "markswoman",
+    "canonicalName": "Markswoman",
+    "rarity": "Advanced",
+    "expertise": "Archer",
+    "labels": [
+      "Markswoman"
+    ]
+  },
+  {
+    "id": "centurion",
+    "canonicalName": "Centurion",
+    "rarity": "Advanced",
+    "expertise": "Gathering",
+    "labels": [
+      "Centurion"
+    ]
+  },
+  {
+    "id": "arthur_pendragon",
+    "canonicalName": "King Arthur",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "King Arthur",
+      "Arthur Pendragon",
+      "Arthur",
+      "Artur",
+      "Rei Arthur"
+    ]
+  },
+  {
+    "id": "gang_gam_chan",
+    "canonicalName": "Gang Gam-chan",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Gang Gam-chan",
+      "Gang Gam Chan",
+      "GGC",
+      "Gang"
+    ]
+  },
+  {
+    "id": "subutai",
+    "canonicalName": "Subutai",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Subutai",
+      "Subutei",
+      "速不台"
+    ]
+  },
+  {
+    "id": "david_iv",
+    "canonicalName": "David IV",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "David IV",
+      "David the Builder",
+      "Davi IV"
+    ]
+  },
+  {
+    "id": "bai_qi",
+    "canonicalName": "Bai Qi",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Bai Qi",
+      "BaiQi",
+      "白起"
+    ]
+  },
+  {
+    "id": "tokugawa",
+    "canonicalName": "Tokugawa Ieyasu",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Tokugawa Ieyasu",
+      "Tokugawa",
+      "Ieyasu",
+      "徳川家康"
+    ]
+  },
+  {
+    "id": "achilles",
+    "canonicalName": "Achilles",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Achilles",
+      "Aquiles",
+      "Brad Pitt"
+    ]
+  },
+  {
+    "id": "hector",
+    "canonicalName": "Hector",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Hector",
+      "Heitor",
+      "Troy"
+    ]
+  },
+  {
+    "id": "philip_ii",
+    "canonicalName": "Philip II",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Philip II",
+      "Philip",
+      "Felipe II",
+      "Felipe"
+    ]
+  },
+  {
+    "id": "eleanor",
+    "canonicalName": "Eleanor of Aquitaine",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Eleanor of Aquitaine",
+      "Eleanor",
+      "Leonor",
+      "Aliénor"
+    ]
+  },
+  {
+    "id": "gonzalo",
+    "canonicalName": "Gonzalo de Córdoba",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Gonzalo de Córdoba",
+      "Gonzalo",
+      "Great Captain",
+      "El Gran Capitán"
+    ]
+  },
+  {
+    "id": "dido",
+    "canonicalName": "Dido",
+    "rarity": "Legendary",
+    "expertise": "Garrison",
+    "labels": [
+      "Dido",
+      "Elissa",
+      "Queen of Carthage"
+    ]
+  },
+  {
+    "id": "jadwiga",
+    "canonicalName": "Jadwiga",
+    "rarity": "Legendary",
+    "expertise": "Cavalry",
+    "labels": [
+      "Jadwiga",
+      "Jad",
+      "Jaddy"
+    ]
+  },
+  {
+    "id": "shajar",
+    "canonicalName": "Shajar al-Durr",
+    "rarity": "Legendary",
+    "expertise": "Garrison",
+    "labels": [
+      "Shajar al-Durr",
+      "Shajar",
+      "Tree of Pearls"
+    ]
+  },
+  {
+    "id": "gajah_mada",
+    "canonicalName": "Gajah Mada",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Gajah Mada",
+      "Gajah",
+      "Mada"
+    ]
+  },
+  {
+    "id": "lapulapu",
+    "canonicalName": "Lapulapu",
+    "rarity": "Legendary",
+    "expertise": "Leadership",
+    "labels": [
+      "Lapulapu",
+      "Lapu",
+      "Lapu-Lapu"
+    ]
+  },
+  {
+    "id": "qin_shi_huang",
+    "canonicalName": "Qin Shi Huang",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Qin Shi Huang",
+      "Qin Shihuang",
+      "QSH",
+      "Qin",
+      "秦始皇"
+    ]
+  },
+  {
+    "id": "shapur",
+    "canonicalName": "Shapur II",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Shapur II",
+      "Shapur",
+      "Shapur2",
+      "Sh4pur"
+    ]
+  },
+  {
+    "id": "siyaj_kak",
+    "canonicalName": "Siyaj K'ak'",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Siyaj K'ak'",
+      "Siyaj Kak",
+      "Siyaj",
+      "K'ak"
+    ]
+  },
+  {
+    "id": "scipio_aemilianus",
+    "canonicalName": "Scipio Aemilianus",
+    "rarity": "Legendary",
+    "expertise": "Infantry",
+    "labels": [
+      "Scipio Aemilianus",
+      "Scipio A",
+      "Aemilianus",
+      "ScipioAem"
+    ]
+  },
+  {
+    "id": "choe_yeong",
+    "canonicalName": "Choe Yeong",
+    "rarity": "Legendary",
+    "expertise": "Archer",
+    "labels": [
+      "Choe Yeong",
+      "Choe Young",
+      "ChoeY",
+      "崔莹"
+    ]
+  },
+  {
+    "id": "john_hunyadi",
+    "canonicalName": "John Hunyadi",
+    "rarity": "Legendary",
+    "expertise": "Engineering",
+    "labels": [
+      "John Hunyadi",
+      "Hunyadi",
+      "John H",
+      "匈雅提·亞諾什"
+    ]
+  },
+  {
+    "id": "stephen_iii",
+    "canonicalName": "Stephen III",
+    "rarity": "Legendary",
+    "expertise": "Engineering",
+    "labels": [
+      "Stephen III",
+      "Stephen3",
+      "Cel Mare",
+      "Ștefan cel Mare"
+    ]
+  },
+  {
+    "id": "archimedes",
+    "canonicalName": "Archimedes",
+    "rarity": "Legendary",
+    "expertise": "Engineering",
+    "labels": [
+      "Archimedes",
+      "Archi",
+      "Archim",
+      "阿基米德"
+    ]
+  },
+  {
+    "id": "mary_i",
+    "canonicalName": "Mary I",
+    "rarity": "Legendary",
+    "expertise": "Engineering",
+    "labels": [
+      "Mary I",
+      "Mary",
+      "Mary1",
+      "Bloody Mary"
+    ]
+  },
+  {
+    "id": "afonso_albuquerque",
+    "canonicalName": "Afonso de Albuquerque",
+    "rarity": "Legendary",
+    "expertise": "Engineering",
+    "labels": [
+      "Afonso de Albuquerque",
+      "Afonso",
+      "Albuquerque",
+      "Afonso I"
+    ]
+  },
+  {
+    "id": "matthias_corvinus",
+    "canonicalName": "Matthias Corvinus",
+    "rarity": "Legendary",
+    "expertise": "Leadership",
+    "labels": [
+      "Matthias Corvinus",
+      "Matthias",
+      "Matthias I",
+      "Corvinus"
+    ]
+  },
+  {
+    "id": "ragnar_prime",
+    "canonicalName": "Ragnar Lodbrok (Prime)",
+    "rarity": "Legendary",
+    "expertise": "Leadership",
+    "labels": [
+      "Ragnar Lodbrok (Prime)",
+      "Ragnar Prime",
+      "Ragnar P",
+      "RagnarLod P"
+    ]
+  },
+  {
+    "id": "casimir_iii",
+    "canonicalName": "Casimir III",
+    "rarity": "Legendary",
+    "expertise": "Gathering",
+    "labels": [
+      "Casimir III",
+      "Casimir",
+      "Casimir3",
+      "Kazimierz Wielki"
+    ]
+  },
+  {
+    "id": "pepin_iii",
+    "canonicalName": "Pepin III",
+    "rarity": "Legendary",
+    "expertise": "Gathering",
+    "labels": [
+      "Pepin III",
+      "Pepin",
+      "Pepin3",
+      "Pepin the Short"
+    ]
+  },
+  {
+    "id": "catherine_medici",
+    "canonicalName": "Catherine de’ Medici",
+    "rarity": "Epic",
+    "expertise": "Engineering",
+    "labels": [
+      "Catherine de’ Medici",
+      "Catherine Medici",
+      "Catherine",
+      "Caterina de' Medici"
+    ]
+  },
+  {
+    "id": "narses",
+    "canonicalName": "Narses",
+    "rarity": "Epic",
+    "expertise": "Engineering",
+    "labels": [
+      "Narses",
+      "Nars3s",
+      "Narses Byzantine"
+    ]
+  },
+  {
+    "id": "wak_chanil_ajaw",
+    "canonicalName": "Wak Chanil Ajaw",
+    "rarity": "Epic",
+    "expertise": "Gathering",
+    "labels": [
+      "Wak Chanil Ajaw",
+      "Wak Chanil",
+      "Ajaw",
+      "Wak"
+    ]
+  }
+]

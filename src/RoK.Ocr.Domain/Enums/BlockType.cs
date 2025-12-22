@@ -9,5 +9,15 @@ public enum BlockType
     Civilization,
     Tag,
     DateOrTime,
-    BarStatus
+    BarStatus,
+    UnitsLabel,
+    DeadLabel,
+    SevereWoundedLabel,
+    SlightlyWoundedLabel,
+    RemainingLabel,
+    HealedLabel,
+    WatchtowerLabel,
+    KillPointsLabel,
+    StatusResult,
+    CommanderName
 }

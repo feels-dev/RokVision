@@ -11,7 +11,7 @@ using System.Diagnostics;
 namespace RoK.Ocr.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/governor")]
 public class OcrController : ControllerBase
 {
     private readonly OcrOrchestrator _orchestrator;
