@@ -4,11 +4,11 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
-using System.Text.Json.Serialization; // Added to map Python JSON
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging; // Added for Serilog/Logging
+using Microsoft.Extensions.Logging;
 using RoK.Ocr.Domain.Interfaces;
 using RoK.Ocr.Domain.Models;
+using RoK.Ocr.Infrastructure.PythonEngine.Dtos; // Using the DTOs created above
 
 namespace RoK.Ocr.Infrastructure.PythonEngine;
 
@@ -39,7 +39,8 @@ public class PythonOcrService : IOcrService
             }
 
             var payload = new { imageBase64 = base64String };
-            var response = await _httpClient.PostAsJsonAsync("governor/analyze", payload); // Adjusted for the new endpoint
+            // Calls the Generic OCR endpoint
+            var response = await _httpClient.PostAsJsonAsync("governor/analyze", payload);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -54,6 +55,7 @@ public class PythonOcrService : IOcrService
                 return (new List<OcrBlock>(), string.Empty);
             }
 
+            // Map DTO to Domain
             var domainBlocks = result.Blocks.Select(b => new OcrBlock
             {
                 Text = b.Text,
@@ -70,9 +72,6 @@ public class PythonOcrService : IOcrService
         }
     }
 
-    // FIX CS0738: Now returns the Tuple of 4 elements according to the Interface
-    // Note: It seems the interface expects 4 items, but implementation returns 5 based on your previous code logic.
-    // Keeping logic as provided.
     public async Task<(List<OcrBlock> Blocks, double Width, double Height, bool IsIsolated, string ProcessedPath)> AnalyzeReportAsync(string imagePath)
     {
         try
@@ -80,6 +79,7 @@ public class PythonOcrService : IOcrService
             byte[] fileBytes = await File.ReadAllBytesAsync(imagePath);
             var payload = new { imageBase64 = Convert.ToBase64String(fileBytes) };
 
+            // Calls the Report OCR endpoint
             var response = await _httpClient.PostAsJsonAsync("reports/analyze", payload);
             if (!response.IsSuccessStatusCode)
             {
@@ -102,7 +102,6 @@ public class PythonOcrService : IOcrService
                 Box = b.Box
             }).ToList();
 
-            // Returning the 5 elements, including the new ProcessedImagePath
             return (blocks,
                     result.Container.CanvasSize.Width,
                     result.Container.CanvasSize.Height,
@@ -112,37 +111,51 @@ public class PythonOcrService : IOcrService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error occurred during AnalyzeReportAsync.");
-            return (new(), 0, 0, false, string.Empty); 
+            return (new(), 0, 0, false, string.Empty);
         }
     }
 
-    // --- UPDATED DTO ---
-    public class PythonReportResponse
+    public async Task<List<OcrBlock>> AnalyzeBatchAsync(string imagePath, List<(string Id, int[] Box, string Strategy)> regions)
     {
-        [JsonPropertyName("success")] public bool Success { get; set; }
-        [JsonPropertyName("blocks")] public List<PythonBlockDto> Blocks { get; set; } = new();
-        [JsonPropertyName("container")] public PythonContainerDto Container { get; set; } = null!;
+        try
+        {
+            // Lê a imagem do disco UMA VEZ
+            byte[] fileBytes = await File.ReadAllBytesAsync(imagePath);
+            string base64String = Convert.ToBase64String(fileBytes);
 
-        // Maps the field coming from Python
-        [JsonPropertyName("processed_image_path")]
-        public string ProcessedImagePath { get; set; } = string.Empty;
-    }
+            var payload = new
+            {
+                imageBase64 = base64String,
+                regions = regions.Select(r => new
+                {
+                    id = r.Id,
+                    box = r.Box, // [x, y, w, h]
+                    strategy = r.Strategy
+                }).ToList()
+            };
 
-    public class PythonContainerDto
-    {
-        [JsonPropertyName("is_isolated")] // Maps Python's snake_case
-        public bool IsIsolated { get; set; }
+            // ÚNICO POST
+            var response = await _httpClient.PostAsJsonAsync("batch/process", payload);
 
-        [JsonPropertyName("canvas_size")]
-        public CanvasSizeDto CanvasSize { get; set; } = null!;
-    }
+            if (!response.IsSuccessStatusCode) return new List<OcrBlock>();
 
-    public class CanvasSizeDto
-    {
-        [JsonPropertyName("width")]
-        public double Width { get; set; }
+            var result = await response.Content.ReadFromJsonAsync<PythonBatchResult>();
+            if (result == null || !result.Success) return new List<OcrBlock>();
 
-        [JsonPropertyName("height")]
-        public double Height { get; set; }
+            // Converte de volta para OcrBlock
+            return result.Results.Select(r => new OcrBlock
+            {
+                Text = r.Text,
+                Confidence = r.Confidence,
+                // Nota: O Box aqui não é relevante pois é um recorte, 
+                // mas podemos usar o ID para rastrear quem é quem
+                Box = new List<List<double>>()
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during Batch Analysis");
+            return new List<OcrBlock>();
+        }
     }
 }

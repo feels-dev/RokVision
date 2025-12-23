@@ -1,6 +1,0 @@
-@RoK.Ocr.Api_HostAddress = http://localhost:5190
-
-GET {{RoK.Ocr.Api_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

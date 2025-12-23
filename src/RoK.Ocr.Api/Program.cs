@@ -1,8 +1,7 @@
-using RoK.Ocr.Application.Cognitive;
-using RoK.Ocr.Application.Magnifier;
-using RoK.Ocr.Application.Reports.Magnifier;
-using RoK.Ocr.Application.Reports.Services;
-using RoK.Ocr.Application.Services;
+using RoK.Ocr.Application.Features.Governor.Orchestrator;
+using RoK.Ocr.Application.Features.Governor.Services;
+using RoK.Ocr.Application.Features.Reports.Orchestrator;
+using RoK.Ocr.Application.Features.Reports.Services; // Includes ReportScoreCalculator
 using RoK.Ocr.Domain.Interfaces;
 using RoK.Ocr.Infrastructure.Persistence;
 using RoK.Ocr.Infrastructure.PythonEngine;
@@ -17,32 +16,32 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHealthChecks();
 
-// Infrastructure: Image Storage
-// Sets the base path as the API root (where the wwwroot folder is located)
+// Infrastructure
 builder.Services.AddSingleton<IImageStorage>(sp =>
     new LocalImageStorage(builder.Environment.WebRootPath ?? builder.Environment.ContentRootPath));
 
-// Infrastructure: Python OCR Service
 builder.Services.AddHttpClient<IOcrService, PythonOcrService>(client =>
 {
-    // Reading URL from appsettings or using the localhost default
     var pythonUrl = builder.Configuration["PythonServiceUrl"] ?? "http://localhost:8000/";
     client.BaseAddress = new Uri(pythonUrl);
-    client.Timeout = TimeSpan.FromSeconds(30); // Generous timeout for heavy OCR processing
+    client.Timeout = TimeSpan.FromSeconds(30);
 });
 
-// FIX CS7036: Added the Logger retrieval from the ServiceProvider (sp)
 builder.Services.AddSingleton<IVocabularyLoader>(sp =>
     new VocabularyLoader(
         builder.Environment.ContentRootPath,
         sp.GetRequiredService<ILogger<VocabularyLoader>>()
     ));
 
-// Application: Core Services
-builder.Services.AddScoped<TheMagnifier>();
-builder.Services.AddScoped<OcrOrchestrator>();
+// --- APPLICATION SERVICES ---
 
+// Feature: Governor
+builder.Services.AddScoped<GovernorMagnifier>(); 
+builder.Services.AddScoped<GovernorOrchestrator>();
+
+// Feature: Reports
 builder.Services.AddScoped<WarMagnifier>();
+builder.Services.AddScoped<ReportScoreCalculator>(); // <--- NEW SERVICE REGISTERED
 builder.Services.AddScoped<ReportOrchestrator>();
 
 var app = builder.Build();
@@ -56,8 +55,6 @@ app.UseSwaggerUI();
 // }
 
 app.UseHttpsRedirection();
-
-// Allow serving static files (to view debugs/uploads if needed)
 app.UseStaticFiles();
 
 app.UseAuthorization();

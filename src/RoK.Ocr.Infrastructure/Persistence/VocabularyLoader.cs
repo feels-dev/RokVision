@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using Microsoft.Extensions.Logging; // Added for Serilog/Logging
+using Microsoft.Extensions.Logging;
 using RoK.Ocr.Domain.Interfaces;
-using RoK.Ocr.Domain.Models.Reports;
+using RoK.Ocr.Domain.Models.Reports; // Para CommanderEntry
 
 namespace RoK.Ocr.Infrastructure.Persistence;
 
@@ -21,7 +21,7 @@ public class VocabularyLoader : IVocabularyLoader
     public VocabularyLoader(string rootPath, ILogger<VocabularyLoader> logger)
     {
         _logger = logger;
-        // Defines the paths for both files
+        // Defines the paths for both files (Assumes Assets folder is in project root)
         _commandersPath = Path.Combine(rootPath, "Assets", "CommandersVocabulary.json");
         _npcsPath = Path.Combine(rootPath, "Assets", "NpcsVocabulary.json");
     }

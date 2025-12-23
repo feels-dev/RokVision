@@ -9,7 +9,7 @@ public class LocalImageStorage : IImageStorage
 {
     private readonly string _basePath;
 
-    // We receive the root path via dependency injection (this will be configured in the API's Program.cs)
+    // We receive the root path via dependency injection (configured in Program.cs)
     public LocalImageStorage(string webRootPath)
     {
         _basePath = webRootPath ?? throw new ArgumentNullException(nameof(webRootPath));

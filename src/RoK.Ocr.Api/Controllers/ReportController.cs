@@ -1,26 +1,11 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using RoK.Ocr.Application.Reports.Services;
+using RoK.Ocr.Api.Dtos.Reports;
+using RoK.Ocr.Application.Features.Reports.Orchestrator; // Namespace updated expectation
 using RoK.Ocr.Domain.Interfaces;
 using RoK.Ocr.Domain.Models.Reports;
-using System;
 using System.Diagnostics;
-using System.IO;
-using System.Threading.Tasks;
-using System.ComponentModel.DataAnnotations;
-using Microsoft.Extensions.Logging;
 
 namespace RoK.Ocr.Api.Controllers;
-
-/// <summary>
-/// DTO (Data Transfer Object) to represent the report submission form.
-/// Used by Swagger/OpenAPI to render the file upload field correctly.
-/// </summary>
-public class ReportUploadDto
-{
-    [Required]
-    public IFormFile Image { get; set; } = null!;
-}
 
 [ApiController]
 [Route("api/reports")]
@@ -44,18 +29,16 @@ public class ReportController : ControllerBase
     /// Receives a battle report screenshot, isolates the beige paper container, 
     /// identifies the combat type (PvP/PvE), and extracts all combat metrics, names, and commanders.
     /// </summary>
-    /// <param name="request">The form-data request containing the image file.</param>
-    /// <returns>A structured JSON containing extracted data and a dynamic confidence score.</returns>
     [HttpPost("analyze")]
     [Consumes("multipart/form-data")]
-    [ProducesResponseType(typeof(ReportResult), StatusCodes.Status200OK)]
-    public async Task<IActionResult> Analyze([FromForm] ReportUploadDto request)
+    [ProducesResponseType(typeof(ReportApiResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Analyze([FromForm] ReportUploadRequest request)
     {
         var sw = Stopwatch.StartNew();
 
         if (request.Image == null || request.Image.Length == 0)
         {
-            return BadRequest(new { success = false, message = "Error: No image selected." });
+            return BadRequest(new ReportApiResponse { Success = false, Message = "Error: No image selected." });
         }
 
         string physicalPath = string.Empty;
@@ -72,23 +55,23 @@ public class ReportController : ControllerBase
 
             sw.Stop();
 
-            return Ok(new
+            return Ok(new ReportApiResponse
             {
-                success = true,
-                message = "Report processed successfully.",
-                processingTimeSeconds = Math.Round(sw.Elapsed.TotalSeconds, 3),
+                Success = true,
+                Message = "Report processed successfully.",
+                ProcessingTimeSeconds = Math.Round(sw.Elapsed.TotalSeconds, 3),
 
                 // Now we take the rawText that came from the tuple, not from the 'data' object
-                rawText = rawText,
+                RawText = rawText,
 
                 // The 'data' object (ReportResult) is now clean and without duplicate RawText
-                data = data
+                Data = data
             });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[ReportController] CRITICAL ERROR: {Message}", ex.Message);
-            return StatusCode(500, new { success = false, message = "Internal server error." });
+            return StatusCode(500, new ReportApiResponse { Success = false, Message = "Internal server error." });
         }
     }
 }
