@@ -48,6 +48,14 @@
 
 ---
 
+## 🏁 Getting Started
+
+The easiest way to run RoK Vision is using Docker. It sets up the Neural Network environment and the API Gateway automatically.
+
+👉 **[Read the Installation Guide](GETTING_STARTED.md)** to get up and running in 5 minutes.
+
+---
+
 ## 🏗️ Architecture
 
 The solution follows a distributed architecture: the **Muscle** (Python) handles the heavy AI computer vision, while the **Brain** (C#) manages the logical orchestration.
