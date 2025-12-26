@@ -2,7 +2,7 @@ import logging
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.core.engine import OcrEngine
-from app.api.routes import governor, reports, batch 
+from app.api.routes import governor, reports, batch, inventory
 
 # Logging Setup
 logging.basicConfig(
@@ -33,6 +33,7 @@ app = FastAPI(
 app.include_router(governor.router, prefix="/governor", tags=["Governor Profile"])
 app.include_router(reports.router, prefix="/reports", tags=["Battle Reports"])
 app.include_router(batch.router, prefix="/batch", tags=["Batch Processing"])
+app.include_router(inventory.router, prefix="/inventory", tags=["Inventory UI"])
 
 @app.get("/health")
 async def health_check():

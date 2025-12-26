@@ -30,6 +30,8 @@ public class PythonBlockDto
     // Python returns [[x,y], [x,y]...]
     [JsonPropertyName("box")]
     public List<List<double>> Box { get; set; } = new();
+    [JsonPropertyName("color")]
+    public string Color { get; set; } = "Unknown";
 }
 
 // --- REPORT RESPONSE ---

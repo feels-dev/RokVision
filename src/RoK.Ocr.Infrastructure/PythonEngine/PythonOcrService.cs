@@ -119,7 +119,7 @@ public class PythonOcrService : IOcrService
     {
         try
         {
-            // Lê a imagem do disco UMA VEZ
+            // Reads the image from disk ONCE
             byte[] fileBytes = await File.ReadAllBytesAsync(imagePath);
             string base64String = Convert.ToBase64String(fileBytes);
 
@@ -134,7 +134,7 @@ public class PythonOcrService : IOcrService
                 }).ToList()
             };
 
-            // ÚNICO POST
+            // SINGLE POST Request
             var response = await _httpClient.PostAsJsonAsync("batch/process", payload);
 
             if (!response.IsSuccessStatusCode) return new List<OcrBlock>();
@@ -142,13 +142,12 @@ public class PythonOcrService : IOcrService
             var result = await response.Content.ReadFromJsonAsync<PythonBatchResult>();
             if (result == null || !result.Success) return new List<OcrBlock>();
 
-            // Converte de volta para OcrBlock
+            // Maps back to OcrBlock
             return result.Results.Select(r => new OcrBlock
             {
+                CustomId = r.Id, // <--- Map here
                 Text = r.Text,
                 Confidence = r.Confidence,
-                // Nota: O Box aqui não é relevante pois é um recorte, 
-                // mas podemos usar o ID para rastrear quem é quem
                 Box = new List<List<double>>()
             }).ToList();
         }
@@ -156,6 +155,44 @@ public class PythonOcrService : IOcrService
         {
             _logger.LogError(ex, "Error during Batch Analysis");
             return new List<OcrBlock>();
+        }
+    }
+
+    public async Task<(List<OcrBlock> Blocks, string FullText)> AnalyzeInventoryAsync(string imagePath)
+    {
+        try
+        {
+            byte[] fileBytes = await File.ReadAllBytesAsync(imagePath);
+            string base64String = Convert.ToBase64String(fileBytes);
+
+            var payload = new { imageBase64 = base64String };
+
+            // Calls the new route /inventory/analyze
+            var response = await _httpClient.PostAsJsonAsync("inventory/analyze", payload);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Inventory API returned error: {StatusCode}", response.StatusCode);
+                return (new List<OcrBlock>(), string.Empty);
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<PythonOcrResponse>();
+            if (result == null || !result.Success) return (new List<OcrBlock>(), string.Empty);
+
+            var domainBlocks = result.Blocks.Select(b => new OcrBlock
+            {
+                Text = b.Text,
+                Confidence = b.Confidence,
+                Box = b.Box,
+                DominantColor = b.Color // Mapping
+            }).ToList();
+
+            return (domainBlocks, result.FullText);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in AnalyzeInventoryAsync");
+            return (new List<OcrBlock>(), string.Empty);
         }
     }
 }

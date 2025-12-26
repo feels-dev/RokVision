@@ -34,13 +34,15 @@
 *   **👤 Governor Profiles**
     Extracts ID, Name, Power, Kill Points, and Civilization from the profile screen with sub-second latency.
 *   **⚔️ Battle Intelligence**
-    Full analysis of PvP and PvE reports, including troop metrics (Dead, Wounded, Remaining), casualty rates, and boss identification.
+    Full analysis of PvP and PvE reports, including troop metrics, casualty rates, and boss identification.
+*   **🎒 Inventory Intelligence (NEW)**
+    Reads complex inventory screens (Action Points & XP Books). Supports **Multi-Screenshot Merging** (scrolling) and uses **Color Detection** to distinguish items.
 *   **📐 Warp & Isolate**
-    Automatically detects the report container, removes city background noise, and applies perspective correction for a "flat paper" read.
-*   **📈 Dynamic Confidence**
-    A self-auditing logic that calculates accuracy based on mathematical consistency (Total Units + Heal = Losses).
+    Automatically detects the report container, removes background noise, and applies perspective correction.
+*   **🎨 Visual Cognitive Engine**
+    Goes beyond text: uses Computer Vision to detect item rarity (colors) and iconic structures, making it resilient to visual noise.
 *   **🔍 The Magnifier (Auto-Healing)**
-    Automatic regional re-scanning with specialized digital filters for low-confidence areas.
+    Automatic regional re-scanning with specialized digital filters (White Isolation, Inverted Binary) for low-confidence areas.
 *   **🌐 Multicultural Core**
     Optimized for Latin alphabets (EN, PT, ES, FR, DE) with smart detection of unsupported characters.
 
@@ -107,6 +109,59 @@ Analyzes complex battle logs, identifying if the target is a Player or NPC.
         "governorName": "Lv. 10 Barbarian", 
         "pveStats": { "damageReceivedPercentage": 43.2 } 
     }
+  }
+}
+```
+
+### 3. Action Points Inventory
+`POST /api/ap/analyze`  
+Extracts AP items from lists. Supports sending multiple images (scroll) in a single request.
+
+#### Response (JSON)
+```json
+{
+  "success": true,
+  "message": "Success. 4 items identified.",
+  "data": {
+    "grandTotalAp": 338750,
+    "currentBarValue": 875,
+    "items": [
+      {
+        "name": "Basic Action Point Recovery",
+        "apValue": 100,
+        "quantity": 2086,
+        "totalValue": 208600
+      }
+    ],
+    "warnings": ["[Conflict] Basic AP: 155 vs 2086. Using 2086 (Larger Value Logic)."]
+  }
+}
+```
+
+## 4. Experience Inventory (Tomes of Knowledge)
+`POST /api/xp/analyze`  
+Analyzes the complex "Other" tab grid. Uses color detection to filter out non-XP items.
+
+#### Response (JSON)
+```json
+{
+  "success": true,
+  "data": {
+    "totalXp": 182180300,
+    "items": [
+      {
+        "itemId": "XP_1000",
+        "unitValue": 1000,
+        "quantity": 145964,
+        "detectedColor": "Blue"
+      },
+      {
+        "itemId": "XP_50000",
+        "unitValue": 50000,
+        "quantity": 58,
+        "detectedColor": "Gold"
+      }
+    ]
   }
 }
 ```

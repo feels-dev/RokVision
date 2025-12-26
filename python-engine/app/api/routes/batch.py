@@ -17,32 +17,32 @@ async def process_batch(request: BatchAnalyzeRequest):
     ocr = OcrEngine.get_instance()
     results = []
 
-    # 2. Loop through requested regions
-    # (Note: PaddleOCR batch list processing is faster than loop, 
-    # but since we apply different filters per crop, loop is fine here)
     for region in request.regions:
         x, y, w, h = region.box
         
-        # Crop & Filter (OpenCV is C++ fast)
+        # Crop & Filter
         processed_crop = ImageProcessor.process_region(
             full_img, int(x), int(y), int(w), int(h), region.strategy
         )
 
         if processed_crop is None:
+            results.append({"id": region.id, "text": "", "conf": 0.0, "strategy": region.strategy})
             continue
 
-        # OCR Inference
-        ocr_res = ocr.ocr(processed_crop, cls=False, det=False) # det=False aumenta velocidade (confia no crop)
+        # --- CRITICAL CHANGE: det=True ---
+        # We enable detection so it finds the "lost" number inside the crop
+        ocr_res = ocr.ocr(processed_crop, cls=False, det=True)
 
         text = ""
         conf = 0.0
         
-        # PaddleOCR returns list of tuples for rec only
+        # The format with det=True is: [[ [box], (text, conf) ], ... ]
         if ocr_res and ocr_res[0]:
-            # Formato com det=False é diferente: [('Text', 0.99), ...]
-            text_data = ocr_res[0][0] 
-            text = text_data[0]
-            conf = float(text_data[1])
+            # We take the block with the highest confidence or concatenate if more than one.
+            # For XP, it is usually a single number. We take the best candidate.
+            best_line = max(ocr_res[0], key=lambda x: x[1][1])
+            text = best_line[1][0]
+            conf = float(best_line[1][1])
 
         results.append({
             "id": region.id,

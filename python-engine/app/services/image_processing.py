@@ -21,7 +21,7 @@ class ImageProcessor:
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             return img
         except Exception as e:
-            logger.error(f"❌ Error decoding base64: {e}")
+            logger.error(f"Error decoding base64: {e}")
             return None
 
     @staticmethod
@@ -30,6 +30,9 @@ class ImageProcessor:
         Resizes the image if it exceeds max_width while maintaining aspect ratio.
         Returns the resized image and the scale ratio used.
         """
+        if img is None:
+            return None, 1.0
+
         h, w = img.shape[:2]
         if w > max_width:
             ratio = max_width / float(w)
@@ -45,7 +48,11 @@ class ImageProcessor:
         Attempts to isolate the beige paper from the background.
         Uses HSV thresholding and Perspective Transform.
         Falls back to a central crop if detection fails.
+        Returns: (processed_image, is_isolated_boolean)
         """
+        if img is None:
+            return None, False
+
         h_orig, w_orig = img.shape[:2]
         
         # Convert to HSV color space
@@ -122,6 +129,7 @@ class ImageProcessor:
     @staticmethod
     def apply_filters(img):
         """Applies a sharpening filter to enhance text edges."""
+        if img is None: return None
         sharpen_kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
         return cv2.filter2D(img, -1, sharpen_kernel)
 
@@ -131,6 +139,7 @@ class ImageProcessor:
         Crops a specific region and applies filters based on strategy.
         Used for Batch Processing / Magnifier logic.
         """
+        if full_img is None: return None
         ih, iw = full_img.shape[:2]
         
         # Safety bounds check
@@ -145,9 +154,8 @@ class ImageProcessor:
 
         # Upscale: Helps OCR read small/blurry numbers
         # Bicubic interpolation is good for enlarging
-        crop = cv2.resize(crop, None, fx=2.5, fy=2.5, interpolation=cv2.INTER_CUBIC)
+        crop = cv2.resize(crop, None, fx=3.0, fy=3.0, interpolation=cv2.INTER_CUBIC)
 
-        # Strategies
         if strategy == "HighContrastBinary":
             gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
             # Binary Threshold
@@ -161,9 +169,93 @@ class ImageProcessor:
             _, binary = cv2.threshold(gray, 120, 255, cv2.THRESH_BINARY)
             return binary
 
+        # --- STRATEGY: WHITE ISOLATION ---
+        elif strategy == "WhiteIsolation":
+            # Convert to HLS (Hue, Lightness, Saturation)
+            # The L (Lightness) channel is perfect for finding pure white regardless of background color.
+            hls = cv2.cvtColor(crop, cv2.COLOR_BGR2HLS)
+            
+            # Define "White" range
+            # L > 180 (0-255) catches bright whites and light greys (shiny numbers)
+            lower_white = np.array([0, 180, 0])
+            upper_white = np.array([255, 255, 255])
+            
+            # Create mask (White becomes 255, everything else 0)
+            mask = cv2.inRange(hls, lower_white, upper_white)
+            
+            # Noise cleaning (removes isolated white dots)
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+            
+            # Slight dilation to "thicken" thin numbers like "1"
+            # This helps the OCR not lose fine strokes
+            mask = cv2.dilate(mask, kernel, iterations=1)
+            
+            # Invert to Black on White (OCR prefers black text on white background)
+            final = cv2.bitwise_not(mask)
+            
+            return final
+
         elif strategy == "Sharpen":
             kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
             return cv2.filter2D(crop, -1, kernel)
 
         # Default: Just Grayscale
         return cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+
+    @staticmethod
+    def detect_dominant_color(crop_img):
+        """
+        Analyzes an image crop and returns the dominant color based on HSV ranges.
+        Targeted for Rise of Kingdoms item rarities (Green, Blue, Purple, Gold).
+        Returns: 'Green', 'Blue', 'Purple', 'Gold', 'Red' or 'Unknown'.
+        """
+        if crop_img is None or crop_img.size == 0:
+            return "Unknown"
+
+        # 1. Convert to HSV (Hue, Saturation, Value)
+        hsv = cv2.cvtColor(crop_img, cv2.COLOR_BGR2HSV)
+        
+        # 2. Define color ranges (Adjusted for RoK artistic style)
+        # Note: OpenCV uses Hue 0-179.
+        
+        colors = {
+            "Red": [
+                (np.array([0, 70, 50]), np.array([10, 255, 255])),
+                (np.array([170, 70, 50]), np.array([180, 255, 255])) # Red wraps around
+            ],
+            "Gold": [ # Legendary Books / Generic Speedups
+                (np.array([15, 70, 70]), np.array([35, 255, 255]))
+            ],
+            "Green": [ # AP Potions / Food / Elite items (greenish background)
+                (np.array([36, 50, 50]), np.array([85, 255, 255]))
+            ],
+            "Blue": [ # Rare Books / Gems / Wood
+                (np.array([86, 60, 60]), np.array([125, 255, 255]))
+            ],
+            "Purple": [ # Epic Books / Epic items
+                (np.array([126, 60, 60]), np.array([165, 255, 255]))
+            ]
+        }
+
+        max_pixels = 0
+        dominant = "Unknown"
+        total_pixels = crop_img.shape[0] * crop_img.shape[1]
+
+        # 3. Pixel count per mask
+        for color_name, ranges in colors.items():
+            mask_count = 0
+            for (lower, upper) in ranges:
+                mask = cv2.inRange(hsv, lower, upper)
+                mask_count += cv2.countNonZero(mask)
+            
+            # If the color occupies the most significant part so far
+            if mask_count > max_pixels:
+                max_pixels = mask_count
+                dominant = color_name
+
+        # Noise filter: If dominant color is very small (e.g. just white text), return Unknown
+        if max_pixels < (total_pixels * 0.05): # Less than 5% of the area
+            return "Unknown"
+
+        return dominant

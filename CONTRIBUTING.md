@@ -2,7 +2,7 @@
 
 First of all, thank you for your interest in the project! 🛡️
 
-### Current Project Status: Initial Development (v0.1.x)
+### Current Project Status: Initial Development (v0.2.x)
 The project is currently in a high-intensity development phase. I am working on the core architecture and fundamental features listed in the [ROADMAP.md].
 
 **Important:** At this stage, I am **not accepting Pull Requests (PRs)** for new features or major refactors. This is to avoid code conflicts while the base structure is still evolving rapidly.

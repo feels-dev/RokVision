@@ -6,9 +6,11 @@ public class OcrBlock
 {
     public string Text { get; set; } = string.Empty;
     public double Confidence { get; set; }
+    public string DominantColor { get; set; } = "Unknown";
 
     // Coordinates: [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
     public List<List<double>> Box { get; set; } = new();
+    public string CustomId { get; set; } = string.Empty;
 
     // Helper to calculate the block center (essential for calculating distances)
     public (double X, double Y) Center

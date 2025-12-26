@@ -1,3 +1,7 @@
+using RoK.Ocr.Application.Features.ActionPoints.Orchestrator;
+using RoK.Ocr.Application.Features.ActionPoints.Services;
+using RoK.Ocr.Application.Features.Experience.Orchestrator;
+using RoK.Ocr.Application.Features.Experience.Services;
 using RoK.Ocr.Application.Features.Governor.Orchestrator;
 using RoK.Ocr.Application.Features.Governor.Services;
 using RoK.Ocr.Application.Features.Reports.Orchestrator;
@@ -44,6 +48,11 @@ builder.Services.AddScoped<WarMagnifier>();
 builder.Services.AddScoped<ReportScoreCalculator>(); // <--- NEW SERVICE REGISTERED
 builder.Services.AddScoped<ReportOrchestrator>();
 
+builder.Services.AddScoped<ApMagnifier>();
+builder.Services.AddScoped<ApOrchestrator>();
+
+builder.Services.AddScoped<XpOrchestrator>();
+builder.Services.AddScoped<XpMagnifier>();
 var app = builder.Build();
 
 // --- 2. HTTP PIPELINE ---
