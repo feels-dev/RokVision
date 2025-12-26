@@ -17,10 +17,12 @@ Before you begin, ensure you have the following installed:
 ### 1. Clone the Repository
 Open your terminal and clone the project:
 
+```
 git clone https://github.com/feels-dev/RokVision.git
 cd RoKVision
+```
 
-### 2. Build and Run (The Easy Way)
+# 2. Build and Run (The Easy Way)
 RoK Vision uses `docker-compose` to orchestrate the Brain (.NET) and the Muscle (Python).
 
 Run the following command to build the images and start the containers:
