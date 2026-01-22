@@ -6,10 +6,10 @@ public static class RokVocabulary
     // 1. MAIN ANCHORS (To find the fields)
     // =================================================================
 
-    public static readonly string[] GovernorLabels = 
+    public static readonly string[] GovernorLabels =
     { 
         // PT-BR / EN / ES / FR
-        "Governador", "Governor", "Gouverneur", "Gobernador", 
+        "Governador", "Governor", "Gouverneur", "Gobernador",
         "ID", "ID:", "(ID", "lD", "1D", // OCR variations for ID
         
         // German / Russian / Turkish
@@ -22,7 +22,7 @@ public static class RokVocabulary
         "الحاكم"  // Arabic
     };
 
-    public static readonly string[] AllianceLabels = 
+    public static readonly string[] AllianceLabels =
     { 
         // PT-BR / EN / ES / FR
         "Alianca", "Alliance", "Alianza", "Aliança", 
@@ -37,7 +37,7 @@ public static class RokVocabulary
         "التحالف" // Arabic
     };
 
-    public static readonly string[] PowerLabels = 
+    public static readonly string[] PowerLabels =
     { 
         // PT-BR / EN / ES / FR
         "Poder", "Power", "Puissance", "P0der", "Powcr", "Poder de Combate",
@@ -53,10 +53,10 @@ public static class RokVocabulary
         "Sức mạnh"       // Vietnamese
     };
 
-    public static readonly string[] KillPointsLabels = 
+    public static readonly string[] KillPointsLabels =
     { 
         // PT-BR / EN / ES / FR
-        "Pontos de Abate", "Kill Points", "Kills", "Abate", "Muertes", 
+        "Pontos de Abate", "Kill Points", "Kills", "Abate", "Muertes",
         "Points de kill", "Troupes tuées",
         
         // German / Russian / Turkish
@@ -69,10 +69,10 @@ public static class RokVocabulary
         "نقاط القتل"         // Arabic
     };
 
-    public static readonly string[] StatusLabels = 
-    { 
-        "Pontos de Acao", "Action Points", "AP", "Barra", "Nivel", 
-        "Stamina", "Energie", "Endurance" 
+    public static readonly string[] StatusLabels =
+    {
+        "Pontos de Acao", "Action Points", "AP", "Barra", "Nivel",
+        "Stamina", "Energie", "Endurance"
     };
 
     // =================================================================
@@ -81,27 +81,55 @@ public static class RokVocabulary
     // =================================================================
     public static readonly string[] UiKeywords = new[]
     {
-        // Menus and Buttons (PT/EN)
-        "VIP", "Mais Informacoes", "More Info", "Perfil", "Profile",
-        "Construir", "Build", "Recrutar", "Recruit", "Pesquisar", "Research",
-        "Reparar", "Repair", "Chat", "Mensagem", "Message", "Comandante",
-        "Commander", "Tropas", "Troops", "Conquistas", "Achievements",
-        "Configuracoes", "Settings", "Ranking", "Classificacao", "Classificac",
-        "Guia", "Guide", "Retrospecto", "Temporada", "Season", "UTC",
-        "Câmara", "City Hall", "Prefeitura", "Hotel de Ville", "Rathaus",
-        
-        // Common International Terms (Russian, German, Chinese)
-        "Настройки", // Settings (RU)
-        "Einstellungen", // Settings (DE)
-        "设置", // Settings (CN)
-        "설정", // Settings (KR)
-        
-        // Events and Screen Labels
-        "Campeoes", "Olimpia", "Olympia", "Arca", "Osiris", "Reino", "Perdido", "Lost Kingdom",
-        "Vitorias", "Wins", "Victories", "Siege", "Victoires", "Siege", // DE/FR
-        "Autarca", "Oculto", "Hidden", "N/A", "NIA",
-        "Bronze", "Ferro", "Idade", "Age", "Feudal", "Dark", "Trevas"
-    };
+
+    "Governador", "Governor", "Governors", "ID:", "ID", "1D:", "ld:",
+    "Civilização", "Civilizacao", "Civilizagao", "Civilization", "Civilizacion",
+    "Aliança", "Alianca", "Alianga", "Alliance", "Alianza", "Alliance Tag",
+    "Poder", "Power", "Poder de Combate", "Puissance", "Kraft", "Moch", "战力",
+    "Pontos de Abate", "Kill Points", "Killpoints", "Puntos de Muerte", "Kills", "击杀",
+    "Pontos de Ação", "Action Points", "Pontos de Acao", "Points d'action", "Aktionspunkte",
+
+    "PERFIL DO GOVERNADOR", "GOVERNOR PROFILE", "PERFIL DEL GOBERNADOR",
+    "Mais Informações", "Mais Informacoes", "More Info", "Plus d'infos", "Más información",
+    "Conquistas", "Achievements", "Logros", "Succès", "Erfolge",
+    "Classificação", "Classificacao", "Classificag", "Rankings", "Ranking", "Clasificación",
+    "Comandante", "Commander", "Comandantes", "Commandant", "Tropas", "Troops", "Unidades",
+    "Configurações", "Configuracoes", "Settings", "Ajustes", "Paramètres", "Einstellungen",
+    "Mensagem", "Message", "Mensajes", "Chat", "Correio", "Mail",
+    "Mural", "Wall", "City Wall", "Muralha",
+
+    "Oculto", "Hidden", "Caché", "Oculto", "Privado",
+    "N/A", "N/IA", "NIA", "None", "Nenhum",
+    "Campeões de Olímpia", "Campeoes de Olimpia", "Olympia Champions", "Champions d'Olympia",
+    "Arca de Osíris", "Arca de Osiris", "Ark of Osiris", "Arche d'Osiris",
+    "O Reino Perdido", "The Lost Kingdom", "Le Royaume Perdu", "KVK",
+    "Vitórias", "Vitorias", "Wins", "Victories", "Victórias", "Victoires", "Siege",
+    "Autarca", "Autarch", "Inestimável", "Inestimavel", "Platina", "Platinum",
+    "Retrospecto da Temporada", "Season Review", "Season", "Temporada",
+
+    "VIP", "Ouro", "Gold", "Gemas", "Gems", "Gemas de Aliança",
+    "Comida", "Food", "Milho", "Corn", "Madeira", "Wood", "Pedra", "Stone",
+    "UTC", "X:", "Y:", "Localização", "Location", "Coordenadas",
+
+    "Construir", "Build", "Recrutar", "Recruit", "Pesquisar", "Research", "Recherche",
+    "Treinar", "Train", "Curar", "Heal", "Hospital", "Ajuda", "Help", "Aide",
+    "Guia de jogabilidade", "Gameplay Guide", "Guide", "Guia",
+    "Republic of Gamers", "ROG", "Space", "Enter", "Back", "Sair", "Exit",
+
+    "Настройки", "Профиль", "Альянс", "Мощь", "Убийства", "Навыки",
+
+    "Einstellungen", "Profil", "Allianz", "Kraft", "Kills", "Kommandant",
+
+    "设置", "个人资料", "联盟", "战力", "击杀", "统帅", "角色",
+    // Coreano
+    "설정", "프로필", "연맹", "전투력", "처치", "사령관",
+
+    "Ajustes", "Perfil", "Alianza", "Poder", "Muerte", "Configurazione", "Profilo",
+
+    "Idade do Bronze", "Bronze Age", "Idade do Ferro", "Iron Age",
+    "Idade das Trevas", "Dark Age", "Idade Feudal", "Feudal Age",
+    "Era Industrial", "Industrial Era"
+};
 
     // =================================================================
     // 3. CIVILIZATIONS (For detection and cleaning)
