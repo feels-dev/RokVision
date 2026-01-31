@@ -8,4 +8,5 @@ public class XpUploadRequest
 {
     [Required]
     public List<IFormFile> Images { get; set; } = new();
+    public bool Debug { get; set; } = false; // NOVO
 }

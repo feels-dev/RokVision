@@ -1,3 +1,4 @@
+# Path: app/core/engine.py
 import os
 import logging
 import numpy as np
@@ -19,20 +20,20 @@ class OcrEngine:
             threads = int(os.getenv('OCR_CPU_THREADS', '4'))
 
             cls._instance = PaddleOCR(
-                use_angle_cls=False, # Mantém False para velocidade
+                use_angle_cls=False, # Keep False for speed
                 lang='en',
                 use_gpu=use_gpu,
                 enable_mkldnn=enable_mkldnn,
                 cpu_threads=threads,
                 show_log=False,
                 ocr_version='PP-OCRv4',
-                # Otimizações de detecção
+                # Detection optimizations
                 det_db_thresh=0.3,
                 det_db_box_thresh=0.6,
                 det_db_unclip_ratio=1.5
             )
             
-            # WARMUP: Passa uma imagem preta minúscula só para carregar os pesos na memória
+            # WARMUP: Pass a tiny black image just to load weights into memory
             try:
                 dummy = np.zeros((100, 100, 3), dtype=np.uint8)
                 cls._instance.ocr(dummy, cls=False)

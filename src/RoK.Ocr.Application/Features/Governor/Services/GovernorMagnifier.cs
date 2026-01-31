@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using RoK.Ocr.Application.Common.Models;
 using RoK.Ocr.Domain.Interfaces;
 using RoK.Ocr.Domain.Models;
 using SixLabors.ImageSharp;
@@ -34,8 +35,15 @@ public class GovernorMagnifier
         if (EnableDebugMode && !Directory.Exists(_debugPath)) Directory.CreateDirectory(_debugPath);
     }
 
-    public async Task<List<OcrBlock>> HuntForField(string imagePath, AnalyzedBlock anchor, string fieldType)
+    public async Task<List<OcrBlock>> HuntForField(
+        string imagePath, 
+        AnalyzedBlock anchor, 
+        string fieldType, 
+        OcrAnalysisContext context)
     {
+        // Start specific timer for this field
+        context.StartTimer($"Magnifier_{fieldType}");
+
         var strategies = GetHuntingStrategies(fieldType);
         
         var anchorRect = new Rect(
@@ -47,78 +55,99 @@ public class GovernorMagnifier
 
         string huntId = DateTime.Now.ToString("HHmmss");
         
+        // Debug Log Variables
+        int strategiesTried = 0;
+        string? winningStrategy = null;
+        bool finalSuccess = false;
+
         Console.WriteLine($"\n[GovernorMagnifier] --- Starting Hunt for: {fieldType} ---");
 
-        foreach (var strategy in strategies)
+        try
         {
-            string cropPathAbsolute = "";
-            try
+            foreach (var strategy in strategies)
             {
-                Console.WriteLine($"[GovernorMagnifier] Trying strategy: {strategy.Name}");
-
-                var roi = strategy.CalculateRegion(anchorRect);
+                strategiesTried++;
+                string cropPathAbsolute = "";
                 
-                cropPathAbsolute = await CreateSmartCrop(imagePath, roi, strategy);
-
-                if (string.IsNullOrEmpty(cropPathAbsolute)) 
+                try
                 {
-                    Console.WriteLine("[GovernorMagnifier] Failure: Invalid crop region.");
-                    continue;
-                }
+                    Console.WriteLine($"[GovernorMagnifier] Trying strategy: {strategy.Name}");
 
-                string relativePath = Path.GetRelativePath(_webRoot, cropPathAbsolute);
+                    var roi = strategy.CalculateRegion(anchorRect);
+                    
+                    cropPathAbsolute = await CreateSmartCrop(imagePath, roi, strategy);
 
-                var result = await _ocrService.AnalyzeImageAsync(relativePath);
-                
-                bool isSuccess = false;
-                string readText = "EMPTY";
-
-                if (result.Blocks.Count > 0)
-                {
-                    readText = result.FullText.Replace("\n", " ").Trim();
-                    Console.WriteLine($"[GovernorMagnifier] OCR Read: '{readText}'");
-
-                    if (result.Blocks.Count > 0 && readText.Length >= 3)
+                    if (string.IsNullOrEmpty(cropPathAbsolute)) 
                     {
-                        isSuccess = true;
-                        Console.WriteLine("[GovernorMagnifier] >> MATCH! Valid text found.");
+                        Console.WriteLine("[GovernorMagnifier] Failure: Invalid crop region.");
+                        continue;
+                    }
+
+                    string relativePath = Path.GetRelativePath(_webRoot, cropPathAbsolute);
+
+                    var result = await _ocrService.AnalyzeImageAsync(relativePath);
+                    
+                    bool isSuccess = false;
+                    string readText = "EMPTY";
+
+                    if (result.Blocks.Count > 0)
+                    {
+                        readText = result.FullText.Replace("\n", " ").Trim();
+                        Console.WriteLine($"[GovernorMagnifier] OCR Read: '{readText}'");
+
+                        // Simple validation for success
+                        if (readText.Length >= 2)
+                        {
+                            isSuccess = true;
+                            Console.WriteLine("[GovernorMagnifier] >> MATCH! Valid text found.");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[GovernorMagnifier] OCR Failure");
+                    }
+
+                    if (EnableDebugMode)
+                    {
+                        string filenameSafe = CleanFileName(readText);
+                        string status = isSuccess ? "HIT" : "MISS";
+                        string debugFilename = $"{huntId}_{fieldType}_{strategy.Name}_{status}_[{filenameSafe}].png";
+                        string debugDest = Path.Combine(_debugPath, debugFilename);
+                        
+                        File.Copy(cropPathAbsolute, debugDest, true);
+                    }
+
+                    if (isSuccess)
+                    {
+                        finalSuccess = true;
+                        winningStrategy = strategy.Name;
+                        
+                        // Log success in context
+                        context.Log($"[Magnifier] Hit on {fieldType} using {strategy.Name}: '{readText}'");
+
+                        return RemapCoordinates(result.Blocks, roi, strategy.ScaleFactor);
                     }
                 }
-                else
+                catch (Exception ex)
                 {
-                    Console.WriteLine($"[GovernorMagnifier] OCR Failure");
+                    Console.WriteLine($"[GovernorMagnifier] ERROR: {ex.Message}");
+                    continue;
                 }
-
-                if (EnableDebugMode)
+                finally
                 {
-                    string filenameSafe = CleanFileName(readText);
-                    string status = isSuccess ? "HIT" : "MISS";
-                    string debugFilename = $"{huntId}_{fieldType}_{strategy.Name}_{status}_[{filenameSafe}].png";
-                    string debugDest = Path.Combine(_debugPath, debugFilename);
-                    
-                    File.Copy(cropPathAbsolute, debugDest, true);
-                    Console.WriteLine($"[GovernorMagnifier] Debug saved: {debugFilename}");
-                }
-
-                if (isSuccess)
-                {
-                    return RemapCoordinates(result.Blocks, roi, strategy.ScaleFactor);
+                    // Cleanup temporary file
+                    if (!string.IsNullOrEmpty(cropPathAbsolute) && File.Exists(cropPathAbsolute)) 
+                    {
+                        try { File.Delete(cropPathAbsolute); } catch { }
+                    }
                 }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[GovernorMagnifier] ERROR: {ex.Message}");
-                if (EnableDebugMode) File.WriteAllText(Path.Combine(_debugPath, $"{huntId}_ERROR.txt"), ex.Message);
-                continue;
-            }
-            finally
-            {
-                // Temporary file cleanup
-                if (!string.IsNullOrEmpty(cropPathAbsolute) && File.Exists(cropPathAbsolute)) 
-                {
-                    try { File.Delete(cropPathAbsolute); } catch { }
-                }
-            }
+        }
+        finally
+        {
+            // Register statistics in context before exit
+            context.RegisterMagnifierAttempt(fieldType, strategiesTried, winningStrategy, finalSuccess);
+            context.StopTimer($"Magnifier_{fieldType}");
         }
 
         Console.WriteLine("[GovernorMagnifier] --- End of Hunt (Unsuccessful) ---\n");
@@ -268,9 +297,9 @@ public class GovernorMagnifier
     {
         public string Name { get; set; } = "Default";
         public double ScaleFactor { get; set; } = 1.0; 
-        public Func<Rect, Rect> CalculateRegion { get; set; } 
-        public Action<IImageProcessingContext> ApplyFilters { get; set; }
+        public Func<Rect, Rect> CalculateRegion { get; set; } = r => r; 
+        public Action<IImageProcessingContext> ApplyFilters { get; set; } = _ => {};
     }
 
     private record Rect(double X, double Y, double Width, double Height);
-} 
+}

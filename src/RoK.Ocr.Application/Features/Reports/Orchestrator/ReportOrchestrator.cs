@@ -1,19 +1,21 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.IO; 
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging; 
+using Microsoft.Extensions.Logging;
+using RoK.Ocr.Application.Common.Cognitive;
+using RoK.Ocr.Application.Common.Dtos;    
+using RoK.Ocr.Application.Common.Models;  
+using RoK.Ocr.Application.Features.Reports.Cognitive;
+using RoK.Ocr.Application.Features.Reports.Neurons;
+using RoK.Ocr.Application.Features.Reports.Services;
+using RoK.Ocr.Application.Reports.Constants;
+using RoK.Ocr.Domain.Enums;
 using RoK.Ocr.Domain.Interfaces;
 using RoK.Ocr.Domain.Models;
 using RoK.Ocr.Domain.Models.Reports;
-using RoK.Ocr.Domain.Enums;
-using RoK.Ocr.Application.Features.Reports.Neurons;
-using RoK.Ocr.Application.Features.Reports.Cognitive;
-using RoK.Ocr.Application.Features.Reports.Services;
-using RoK.Ocr.Application.Common.Cognitive;
-using RoK.Ocr.Application.Reports.Constants;
 
 namespace RoK.Ocr.Application.Features.Reports.Orchestrator;
 
@@ -23,8 +25,8 @@ public class ReportOrchestrator
     private readonly WarMagnifier _magnifier;
     private readonly IVocabularyLoader _vocabLoader;
     private readonly IImageStorage _storage;
-    private readonly ReportScoreCalculator _scoreCalculator; // Logic extracted
-    private readonly ILogger<ReportOrchestrator> _logger; 
+    private readonly ReportScoreCalculator _scoreCalculator;
+    private readonly ILogger<ReportOrchestrator> _logger;
 
     public ReportOrchestrator(
         IOcrService ocrService,
@@ -32,7 +34,7 @@ public class ReportOrchestrator
         IVocabularyLoader vocabLoader,
         IImageStorage storage,
         ReportScoreCalculator scoreCalculator,
-        ILogger<ReportOrchestrator> logger) 
+        ILogger<ReportOrchestrator> logger)
     {
         _ocrService = ocrService;
         _magnifier = magnifier;
@@ -42,17 +44,39 @@ public class ReportOrchestrator
         _logger = logger;
     }
 
-    public async Task<(ReportResult Data, string RawText)> AnalyzeAsync(string imagePath)
+    public async Task<(ReportResult Data, OcrAnalysisContext Context)> AnalyzeAsync(string imagePath, bool debugMode = false)
     {
+        // 1. Initialize Context and Timers
+        var context = new OcrAnalysisContext();
+        context.StartTimer("TotalOrchestration");
+        
+        context.Log($"Starting Report Analysis for: {Path.GetFileName(imagePath)}");
         var result = new ReportResult();
 
-        // 1. Initial OCR and paper isolation
-        // This calls the optimized Python endpoint with Resize
+        // 2. Initial OCR (Python)
+        context.StartTimer("PythonInitialScan");
         var (blocks, width, height, isIsolated, processedImgName) = await _ocrService.AnalyzeReportAsync(imagePath);
+        context.StopTimer("PythonInitialScan");
+        
+        context.Log($"OCR Scan Complete. Found {blocks.Count} blocks. Isolated: {isIsolated}");
 
-        string rawText = string.Join(" | ", blocks.Select(b => b.Text));
+        // Populate basic debug info if requested
+        if (debugMode)
+        {
+            context.DebugInfo.Image = new ImageMetaDto 
+            { 
+                Path = imagePath, 
+                // Report returns the processed canvas size, use as reference
+                Width = (int)width, 
+                Height = (int)height,
+                ResizeScale = 1.0 // Python returns normalized coords
+            };
+            // RawText can be large for reports, construct if needed
+            context.DebugInfo.RawText = string.Join("\n", blocks.Select(b => b.Text));
+        }
 
-        // 2. Mapping to analyzed nodes
+        // 3. Classification and Graph
+        context.StartTimer("GraphBuild");
         var nodes = blocks.Select(b => new AnalyzedBlock
         {
             Raw = b,
@@ -60,12 +84,25 @@ public class ReportOrchestrator
             CanvasHeight = height
         }).ToList();
 
-        // 3. Classification and Topology
         WarBlockClassifier.ClassifyNodes(nodes);
         var graph = new TopologyGraph(nodes, width, height);
-        result.Type = DetectReportType(nodes);
+        
+        // Register anchors for debug
+        if (debugMode)
+        {
+            var anchors = nodes
+                .Where(n => n.Type != BlockType.Unknown && n.Type != BlockType.Number)
+                .Select(n => n.Type.ToString())
+                .Distinct();
+            context.RegisterAnchors(anchors);
+        }
 
-        // 4. Intelligence Cycle & Auto-Healing
+        result.Type = DetectReportType(nodes);
+        context.StopTimer("GraphBuild");
+        
+        context.Log($"Detected Report Type: {result.Type}");
+
+        // 4. Intelligence and Repair Cycle
         int maxRetries = 2;
         int retryCount = 0;
         bool processingNeeded = true;
@@ -73,121 +110,120 @@ public class ReportOrchestrator
         string targetImageForMagnifier = imagePath;
         if (!string.IsNullOrEmpty(processedImgName))
         {
-            // We use the processed image (sharpened/isolated) for repairs
             targetImageForMagnifier = Path.Combine(_storage.GetBasePath(), "uploads", processedImgName);
         }
 
         while (processingNeeded && retryCount <= maxRetries)
         {
-            ExecuteSpecializedNeurons(graph, nodes, result);
+            if (retryCount > 0) context.Log($"--- Repair Cycle {retryCount} ---");
+            context.StartTimer($"Cycle_{retryCount}");
 
-            result.Warnings.RemoveAll(w => w.Contains("Mismatch"));
-            ConsistencyAuditor.Audit(result);
+            // Execute Neurons and populate result
+            ExecuteSpecializedNeurons(graph, nodes, result, context);
 
-            // If math is wrong, trigger the Repair Cycle
+            // Consistency Audit (Math)
+            AuditConsistency(result, context);
+
+            // Check if repair is needed
             if (!result.IsMathematicallySound() && retryCount < maxRetries)
             {
-                await AttemptRepairAsync(targetImageForMagnifier, nodes, retryCount);
+                context.LogWarning("WARN_MATH_MISMATCH", "Troops calculation mismatch. Initiating Batch Repair.");
                 
-                // Rebuild graph with potentially updated numbers
+                // Attempt repair via Magnifier
+                await AttemptRepairAsync(targetImageForMagnifier, nodes, context);
+
+                // Reconstruct graph with updated numbers
                 graph = new TopologyGraph(nodes, width, height);
                 retryCount++;
+
+                // Clear old warnings to re-validate
+                result.Warnings.Clear();
             }
             else
             {
                 processingNeeded = false;
             }
+            
+            context.StopTimer($"Cycle_{retryCount}");
         }
 
-        // 5. Metadata and Sanity Checks
-        ExtractContextMetadata(nodes, result);
-        RunSanityCheck(result, isIsolated);
+        // 5. Metadata and Sanity Check
+        ExtractContextMetadata(nodes, result, context);
+        RunSanityCheck(result, isIsolated, context);
 
-        // 6. Dynamic Confidence Calculation
+        // 6. Global Confidence
         result.OverallConfidence = _scoreCalculator.Calculate(result, nodes, isIsolated);
 
-        // 7. Cleanup temporary files
-        // (Optional: Keep for debugging if needed, otherwise delete)
+        // Capture final numerical evidence
+        CaptureMetricsEvidence(graph, result.Attacker, "atk", context);
+        if (result.Type != ReportType.Barbarian)
+        {
+            CaptureMetricsEvidence(graph, result.Defender, "def", context);
+        }
+
+        context.StopTimer("TotalOrchestration");
+        context.Log($"Analysis Finished. Overall Confidence: {result.OverallConfidence:F2}%");
+
+        // Cleanup temporary processed image
         if (targetImageForMagnifier != imagePath && File.Exists(targetImageForMagnifier))
         {
             try { File.Delete(targetImageForMagnifier); } catch { }
         }
 
-        return (result, rawText);
+        return (result, context);
     }
 
-    private ReportType DetectReportType(List<AnalyzedBlock> nodes)
-    {
-        bool isBarbarian = nodes.Any(n =>
-            WarVocabulary.BarbarianKeywords.Any(key =>
-                RokCognitiveTools.CalculateSimilarity(n.Raw.Text, key) > 0.85 ||
-                n.Raw.Text.Contains(key, StringComparison.OrdinalIgnoreCase)
-            )
-        );
+    // --- HELPER METHODS ---
 
-        return isBarbarian ? ReportType.Barbarian : ReportType.SingleBattle_PVP;
-    }
-
-    private void ExecuteSpecializedNeurons(TopologyGraph graph, List<AnalyzedBlock> nodes, ReportResult result)
+    private void ExecuteSpecializedNeurons(
+        TopologyGraph graph,
+        List<AnalyzedBlock> nodes,
+        ReportResult result,
+        OcrAnalysisContext context)
     {
         var commanders = _vocabLoader.GetCommanders();
-        var npcsVocab = _vocabLoader.GetNpcs();
-
         var tagNeuron = new AllianceTagNeuron();
         var nameNeuron = new GovernorNameNeuron(commanders);
         var metricNeuron = new WarMetricNeuron();
-
         var playerCommNeuron = new CommanderNeuron(commanders);
-        var npcCommNeuron = new CommanderNeuron(npcsVocab);
 
-        var anchorNode = nodes.FirstOrDefault(n =>
-            n.Type == BlockType.StatusResult ||
-            WarVocabulary.VictoryTerms.Any(v => n.Raw.Text.Contains(v, StringComparison.OrdinalIgnoreCase)) ||
-            WarVocabulary.DefeatTerms.Any(d => n.Raw.Text.Contains(d, StringComparison.OrdinalIgnoreCase))
-        );
-
+        // Define cutoff height
+        var anchorNode = nodes.FirstOrDefault(n => n.Type == BlockType.StatusResult);
         double battleMetricsStartY = anchorNode != null ? anchorNode.NormalizedCenter.Y : 0.4;
 
-        // PHASE 1: ATTACKER
+        // === ATTACKER ===
         result.Attacker.IsNpc = false;
+        var resAtkTag = tagNeuron.Extract(graph, SideLocation.Attacker);
+        result.Attacker.AllianceTag = resAtkTag.Tag;
+        context.RegisterResult("atk_tag", CreateResult(resAtkTag.Tag, resAtkTag.OriginalBlock), "AllianceTagNeuron");
 
-        var resAtk = tagNeuron.Extract(graph, SideLocation.Attacker);
-        result.Attacker.AllianceTag = resAtk.Tag;
-        result.Attacker.GovernorName = nameNeuron.Extract(
-            graph,
-            resAtk.OriginalBlock,
-            SideLocation.Attacker,
-            nodes,
-            resAtk.NameSuffix
-        );
+        result.Attacker.GovernorName = nameNeuron.Extract(graph, resAtkTag.OriginalBlock, SideLocation.Attacker, nodes, resAtkTag.NameSuffix);
+        context.RegisterResult("atk_name", CreateResult(result.Attacker.GovernorName, null), "GovernorNameNeuron");
 
         metricNeuron.PopulateSide(graph, result.Attacker, SideLocation.Attacker, nodes, battleMetricsStartY);
 
-        var commandersAtk = playerCommNeuron.Extract(graph, SideLocation.Attacker, nodes);
-        result.Attacker.PrimaryCommander = commandersAtk.ElementAtOrDefault(0);
-        result.Attacker.SecondaryCommander = commandersAtk.ElementAtOrDefault(1);
+        var commsAtk = playerCommNeuron.Extract(graph, SideLocation.Attacker, nodes);
+        result.Attacker.PrimaryCommander = commsAtk.ElementAtOrDefault(0);
+        result.Attacker.SecondaryCommander = commsAtk.ElementAtOrDefault(1);
 
+        // === DEFENDER ===
+        var npcCommanders = TryIdentifyNpcCommaders(graph, nodes);
+        bool isNpcBattle = result.Type == ReportType.Barbarian || npcCommanders.Any();
 
-        // PHASE 2: DEFENDER
-        if (result.Type == ReportType.Barbarian)
+        if (isNpcBattle)
         {
+            result.Type = ReportType.Barbarian;
             result.Defender.IsNpc = true;
-            result.Defender.AllianceTag = "--";
+            context.Log($"Def: Identified as NPC/Barbarian. Forcing PVE type.");
 
-            var barbBlock = nodes.FirstOrDefault(n =>
-                WarVocabulary.BarbarianKeywords.Any(key => n.Raw.Text.Contains(key, StringComparison.OrdinalIgnoreCase))
-            );
-            result.Defender.GovernorName = barbBlock != null ? barbBlock.Raw.Text.Trim() : "NPC_Entity";
-
-            var bossesFound = npcCommNeuron.Extract(graph, SideLocation.Defender, nodes);
-            result.Defender.PrimaryCommander = bossesFound.ElementAtOrDefault(0);
-            result.Defender.SecondaryCommander = bossesFound.ElementAtOrDefault(1);
+            result.Defender.PrimaryCommander = npcCommanders.ElementAtOrDefault(0);
+            result.Defender.SecondaryCommander = npcCommanders.ElementAtOrDefault(1);
+            result.Defender.GovernorName = result.Defender.PrimaryCommander?.CanonicalName ?? "NPC_Entity";
 
             metricNeuron.PopulateSide(graph, result.Defender, SideLocation.Defender, nodes, battleMetricsStartY);
 
             var pveNeuron = new PveMetricNeuron();
             result.Defender.PveStats = pveNeuron.Extract(nodes, SideLocation.Defender);
-            // Enrich PveStats with EntityLevel if needed
             if (result.Defender.PveStats != null)
             {
                 result.Defender.PveStats.EntityLevel = int.TryParse(Regex.Match(result.Defender.GovernorName, @"\d+").Value, out int lvl) ? lvl : 0;
@@ -197,154 +233,134 @@ public class ReportOrchestrator
         else
         {
             result.Defender.IsNpc = false;
+            var resDefTag = tagNeuron.Extract(graph, SideLocation.Defender);
+            result.Defender.AllianceTag = resDefTag.Tag;
+            context.RegisterResult("def_tag", CreateResult(resDefTag.Tag, resDefTag.OriginalBlock), "AllianceTagNeuron");
 
-            var resDef = tagNeuron.Extract(graph, SideLocation.Defender);
-            result.Defender.AllianceTag = resDef.Tag;
-
-            result.Defender.GovernorName = nameNeuron.Extract(
-                graph,
-                resDef.OriginalBlock,
-                SideLocation.Defender,
-                nodes,
-                resDef.NameSuffix
-            );
+            result.Defender.GovernorName = nameNeuron.Extract(graph, resDefTag.OriginalBlock, SideLocation.Defender, nodes, resDefTag.NameSuffix);
+            context.RegisterResult("def_name", CreateResult(result.Defender.GovernorName, null), "GovernorNameNeuron");
 
             metricNeuron.PopulateSide(graph, result.Defender, SideLocation.Defender, nodes, battleMetricsStartY);
 
-            var commandersDef = playerCommNeuron.Extract(graph, SideLocation.Defender, nodes);
-            result.Defender.PrimaryCommander = commandersDef.ElementAtOrDefault(0);
-            result.Defender.SecondaryCommander = commandersDef.ElementAtOrDefault(1);
+            var commsDef = playerCommNeuron.Extract(graph, SideLocation.Defender, nodes);
+            result.Defender.PrimaryCommander = commsDef.ElementAtOrDefault(0);
+            result.Defender.SecondaryCommander = commsDef.ElementAtOrDefault(1);
         }
 
-        // PHASE 3: FINAL CLEANUP
-        if (string.IsNullOrWhiteSpace(result.Attacker.GovernorName) || result.Attacker.GovernorName.Length < 1)
-            result.Attacker.GovernorName = "--";
+        // Cleanup
+        if (string.IsNullOrWhiteSpace(result.Attacker.GovernorName) || result.Attacker.GovernorName.Length < 1) result.Attacker.GovernorName = "--";
+        if (string.IsNullOrWhiteSpace(result.Defender.GovernorName) || result.Defender.GovernorName.Length < 1) result.Defender.GovernorName = "--";
+    }
 
-        if (string.IsNullOrWhiteSpace(result.Defender.GovernorName) || result.Defender.GovernorName.Length < 1)
-            result.Defender.GovernorName = "--";
-
-        if (result.Attacker.PrimaryCommander != null &&
-            result.Attacker.GovernorName.Contains(result.Attacker.PrimaryCommander.CanonicalName))
+    private void CaptureMetricsEvidence(TopologyGraph graph, BattleSide side, string prefix, OcrAnalysisContext context)
+    {
+        var map = new Dictionary<string, long>
         {
-            result.Attacker.GovernorName = "--";
+            { "total_units", side.TotalUnits }, { "dead", side.Dead }, { "sev_wounded", side.SeverelyWounded },
+            { "sli_wounded", side.SlightlyWounded }, { "remaining", side.Remaining }, { "healed", side.Healed },
+            { "kp", side.KillPointsGained }
+        };
+
+        foreach (var kvp in map)
+        {
+            if (kvp.Value <= 0) continue;
+            // Register simple evidence
+            context.RegisterResult($"{prefix}_{kvp.Key}", new ExtractionResult<long> { Value = kvp.Value, Confidence = 90 }, "WarMetricNeuron");
         }
     }
 
-    private void ExtractContextMetadata(List<AnalyzedBlock> nodes, ReportResult result)
+    private void AuditConsistency(ReportResult report, OcrAnalysisContext context)
+    {
+        void Check(BattleSide side, string name)
+        {
+            if (side.TotalUnits <= 0) return;
+            long expected = side.TotalUnits + side.Healed;
+            long actual = side.Dead + side.SeverelyWounded + side.SlightlyWounded + side.Remaining + side.WatchtowerDamage;
+            if (Math.Abs(expected - actual) > 5)
+                context.LogWarning("WARN_MATH_MISMATCH", $"[{name}] Math mismatch: Expected {expected} vs Actual {actual} (Diff: {expected - actual})");
+        }
+        Check(report.Attacker, "Attacker");
+        if (report.Type != ReportType.Barbarian) Check(report.Defender, "Defender");
+    }
+
+    private async Task AttemptRepairAsync(string imagePath, List<AnalyzedBlock> nodes, OcrAnalysisContext context)
+    {
+        context.StartTimer("MagnifierBatchRepair");
+        
+        var lowConfNodes = nodes.Where(n => n.Type == BlockType.Number && n.Raw.Confidence < 0.85).ToList();
+        if (!lowConfNodes.Any()) 
+        {
+            context.StopTimer("MagnifierBatchRepair");
+            return;
+        }
+
+        context.Log($"Batch Repair: Sending {lowConfNodes.Count} nodes to Python Magnifier.");
+        
+        // Call Magnifier (passing context for detailed logs)
+        var results = await _magnifier.RescanBatchAsync(imagePath, lowConfNodes, context);
+
+        int recovered = 0;
+        foreach (var node in lowConfNodes)
+        {
+            var bestFit = results
+                .Where(r => r.Text.All(char.IsDigit) && r.Confidence > node.Raw.Confidence)
+                .OrderByDescending(r => r.Confidence)
+                .FirstOrDefault();
+
+            if (bestFit != null)
+            {
+                context.Log($"Repair Success: '{node.Raw.Text}' -> '{bestFit.Text}' ({bestFit.Confidence:P})");
+                node.Raw.Text = bestFit.Text;
+                node.Raw.Confidence = bestFit.Confidence;
+                results.Remove(bestFit);
+                recovered++;
+            }
+        }
+        
+        // Register Magnifier stats in DebugInfo
+        context.RegisterMagnifierAttempt("BatchMathRepair", lowConfNodes.Count, $"Recovered: {recovered}", recovered > 0);
+        
+        context.StopTimer("MagnifierBatchRepair");
+    }
+
+    private void RunSanityCheck(ReportResult result, bool isIsolated, OcrAnalysisContext context)
+    {
+        if (!isIsolated) context.LogWarning("WARN_NO_ISOLATION", "Report paper was not isolated.");
+        if (result.Attacker.AllianceTag != "--" && result.Attacker.GovernorName == "--")
+            context.LogWarning("WARN_TAG_BUT_NO_NAME", "Attacker tag found but name is missing.");
+    }
+
+    private void ExtractContextMetadata(List<AnalyzedBlock> nodes, ReportResult result, OcrAnalysisContext context)
     {
         var dateMatch = nodes
             .Select(n => Regex.Match(n.Raw.Text, @"(\d{2,4}[/\-]\d{2}([/\-]\d{2,4})?)"))
             .FirstOrDefault(m => m.Success);
 
-        if (dateMatch != null && dateMatch.Success)
+        if (dateMatch != null)
         {
             string datePart = dateMatch.Groups[1].Value;
             if (datePart.Length <= 5) datePart = $"{DateTime.Now.Year}/{datePart}";
             if (DateTime.TryParse(datePart.Replace("-", "/"), out DateTime dt))
-                result.Timestamp = dt;
-        }
-
-        var coordMatch = nodes
-            .Select(n => Regex.Match(n.Raw.Text, @"X:?\s*(\d+)\D*Y:?\s*(\d+)", RegexOptions.IgnoreCase))
-            .FirstOrDefault(m => m.Success);
-
-        if (coordMatch != null && coordMatch.Success)
-        {
-            result.MapCoordinates = $"X:{coordMatch.Groups[1].Value} Y:{coordMatch.Groups[2].Value}";
-        }
-    }
-
-    /// <summary>
-    /// Executes the Self-Healing process using Batch Processing.
-    /// Sends all low-confidence nodes to Python in a single shot.
-    /// </summary>
-    private async Task AttemptRepairAsync(string imagePath, List<AnalyzedBlock> nodes, int currentRetry)
-    {
-        // 1. Identify low confidence numeric nodes that likely caused the math mismatch
-        var lowConfidenceNodes = nodes
-            .Where(n => n.Type == BlockType.Number && n.Raw.Confidence < 0.85) // Heuristic threshold
-            .ToList();
-
-        if (!lowConfidenceNodes.Any()) return;
-
-        // 2. Call Batch Magnifier (OPTIMIZATION: 1 HTTP Request instead of N)
-        // Python returns a list of "Best Guesses" from the specialized filters
-        var repairResults = await _magnifier.RescanBatchAsync(imagePath, lowConfidenceNodes);
-
-        if (!repairResults.Any()) return;
-
-        // 3. Apply Repairs (Smart Matching)
-        // Since we lost the direct link (ID) in the simplistic response, we try to match by value proximity
-        // or simply assume that if the Magnifier returns a valid number, it replaces the bad one.
-        
-        // Refined Logic:
-        // We iterate over the nodes we sent for repair. 
-        // Ideally, we should have the ID mapping, but for now we look for the best match in the pool.
-        
-        foreach (var node in lowConfidenceNodes)
-        {
-            // We look for a result in the repair pool that is:
-            // A) Strictly numeric
-            // B) Has better confidence than what we currently have
-            // C) (Optional) Is numerically plausible (e.g. not 10x larger/smaller if it was just a smudge)
-            
-            var betterCandidate = repairResults
-                .Where(r => IsNumeric(r.Text))
-                .OrderByDescending(r => r.Confidence)
-                .FirstOrDefault();
-
-            if (betterCandidate != null && betterCandidate.Confidence > node.Raw.Confidence)
             {
-                // Apply fix
-                _logger.LogInformation("Repair Success: {Old} ({ConfOld:P}) -> {New} ({ConfNew:P})", 
-                    node.Raw.Text, node.Raw.Confidence, betterCandidate.Text, betterCandidate.Confidence);
-
-                node.Raw.Text = betterCandidate.Text;
-                node.Raw.Confidence = betterCandidate.Confidence;
-                
-                // Remove used candidate to avoid reusing it for another node 
-                // (Simple greedy consumption)
-                repairResults.Remove(betterCandidate);
+                result.Timestamp = dt;
+                context.RegisterResult("timestamp", new ExtractionResult<string> { Value = dt.ToString("s"), Confidence = 100 }, "MetadataRegex");
             }
         }
     }
 
-    private bool IsNumeric(string t) => Regex.IsMatch(t, @"^\d+$");
-
-    private void RunSanityCheck(ReportResult result, bool isIsolated)
+    private ReportType DetectReportType(List<AnalyzedBlock> nodes)
     {
-        if (!isIsolated)
-        {
-            result.Warnings.Add("WARN_IMAGE_NOT_ISOLATED: The report paper was not automatically isolated. Results may be inaccurate.");
-        }
+        bool isBarbarian = nodes.Any(n => WarVocabulary.BarbarianKeywords.Any(k => n.Raw.Text.Contains(k, StringComparison.OrdinalIgnoreCase)));
+        return isBarbarian ? ReportType.Barbarian : ReportType.SingleBattle_PVP;
+    }
 
-        if (result.Attacker.AllianceTag != "--" && result.Attacker.GovernorName == "--")
-        {
-            result.Warnings.Add("WARN_UNSUPPORTED_CHARACTERS: Alliance tag detected, but governor name is empty.");
-        }
+    private ExtractionResult<T> CreateResult<T>(T val, AnalyzedBlock? block) =>
+        new ExtractionResult<T> { Value = val, Confidence = block?.Raw.Confidence ?? 80, SourceBlock = block };
 
-        if (!result.IsMathematicallySound())
-        {
-            if (result.Attacker.TotalUnits == 0)
-                result.Warnings.Add("WARN_DATA_MISSING_TOTAL_UNITS: 'Total Units' field missing.");
-            else
-                result.Warnings.Add("WARN_MATH_MISMATCH: Troop sums do not match totals.");
-        }
-
-        if (result.Attacker.GovernorName == "--" && result.Attacker.TotalUnits > 0)
-        {
-            result.Warnings.Add("WARN_NAME_IDENTIFICATION_FAILED: Metrics read, but name not identified.");
-        }
-        
-        double nameSimilarity = RokCognitiveTools.CalculateSimilarity(result.Attacker.GovernorName, result.Defender.GovernorName);
-        if (nameSimilarity > 0.80 && result.Attacker.GovernorName != "--")
-        {
-            result.Warnings.Add("WARN_DUPLICATE_NAMES: Attacker and Defender names are identical.");
-        }
-
-        if (result.Attacker.GovernorName.Contains(result.Attacker.AllianceTag) && result.Attacker.AllianceTag != "--")
-        {
-            result.Warnings.Add("WARN_HEADER_READ_AS_NAME: Name contains tag residues.");
-        }
+    private List<CommanderEntry> TryIdentifyNpcCommaders(TopologyGraph graph, List<AnalyzedBlock> nodes)
+    {
+        var npcsVocab = _vocabLoader.GetNpcs();
+        var npcCommNeuron = new CommanderNeuron(npcsVocab);
+        return npcCommNeuron.Extract(graph, SideLocation.Defender, nodes);
     }
 }

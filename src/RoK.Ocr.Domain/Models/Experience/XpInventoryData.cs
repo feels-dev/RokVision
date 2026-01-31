@@ -7,9 +7,7 @@ public class XpInventoryData
 {
     public long TotalXp => Items.Sum(i => i.TotalXp);
     public List<XpItemEntry> Items { get; set; } = new();
-    public List<string> Warnings { get; set; } = new();
-    // public List<string> BlockDebug { get; set; } = new();
-    public string RawText { get; set; } = string.Empty;
+
 }
 
 public class XpItemEntry

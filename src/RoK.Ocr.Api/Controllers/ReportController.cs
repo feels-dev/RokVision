@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using RoK.Ocr.Api.Dtos.Reports;
-using RoK.Ocr.Application.Features.Reports.Orchestrator; // Namespace updated expectation
+using RoK.Ocr.Application.Common.Dtos; // RokResponse, Factory
+using RoK.Ocr.Application.Features.Reports.Orchestrator;
 using RoK.Ocr.Domain.Interfaces;
 using RoK.Ocr.Domain.Models.Reports;
 using System.Diagnostics;
@@ -20,58 +21,65 @@ public class ReportController : ControllerBase
         IImageStorage storage,
         ILogger<ReportController> logger)
     {
-        _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
-        _storage = storage ?? throw new ArgumentNullException(nameof(storage));
+        _orchestrator = orchestrator;
+        _storage = storage;
         _logger = logger;
     }
 
-    /// <summary>
-    /// Receives a battle report screenshot, isolates the beige paper container, 
-    /// identifies the combat type (PvP/PvE), and extracts all combat metrics, names, and commanders.
-    /// </summary>
     [HttpPost("analyze")]
     [Consumes("multipart/form-data")]
-    [ProducesResponseType(typeof(ReportApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(RokResponse<ReportResult>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Analyze([FromForm] ReportUploadRequest request)
     {
-        var sw = Stopwatch.StartNew();
+        var swGlobal = Stopwatch.StartNew();
 
         if (request.Image == null || request.Image.Length == 0)
-        {
-            return BadRequest(new ReportApiResponse { Success = false, Message = "Error: No image selected." });
-        }
+            return BadRequest(ResponseFactory.CreateFailure<ReportResult>("No image selected.", "ERR_NO_IMAGE", 400));
 
         string physicalPath = string.Empty;
 
         try
         {
+            // 1. Save Image
             using (var stream = request.Image.OpenReadStream())
             {
                 physicalPath = await _storage.SaveImageAsync(stream, request.Image.FileName);
             }
 
-            // --- ATTENTION HERE: Receiving the Tuple ---
-            var (data, rawText) = await _orchestrator.AnalyzeAsync(physicalPath);
+            // 2. Call Orchestrator
+            // The orchestrator manages its own timers internally
+            var (data, context) = await _orchestrator.AnalyzeAsync(physicalPath, request.Debug);
 
-            sw.Stop();
+            swGlobal.Stop();
 
-            return Ok(new ReportApiResponse
+            // 3. Build Rich Response
+            var response = ResponseFactory.CreateSuccess(
+                summary: data,
+                fields: context.Evidence,
+                auditLog: context.AuditLog,
+                processingTime: swGlobal.Elapsed.TotalSeconds,
+                overallConfidence: data.OverallConfidence,
+                warnings: context.Warnings
+            );
+
+            // 4. Populate Debug if requested
+            if (request.Debug)
             {
-                Success = true,
-                Message = "Report processed successfully.",
-                ProcessingTimeSeconds = Math.Round(sw.Elapsed.TotalSeconds, 3),
+                // Basic image info (For reports, Python returns the processed canvas size, 
+                // which the orchestrator puts in the context)
+                response.Debug = context.DebugInfo;
+            }
+            else
+            {
+                response.Debug = null;
+            }
 
-                // Now we take the rawText that came from the tuple, not from the 'data' object
-                RawText = rawText,
-
-                // The 'data' object (ReportResult) is now clean and without duplicate RawText
-                Data = data
-            });
+            return Ok(response);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[ReportController] CRITICAL ERROR: {Message}", ex.Message);
-            return StatusCode(500, new ReportApiResponse { Success = false, Message = "Internal server error." });
+            return StatusCode(500, ResponseFactory.CreateFailure<ReportResult>($"Internal server error: {ex.Message}"));
         }
     }
 }

@@ -4,9 +4,9 @@
 
 ![Badge](https://img.shields.io/badge/.NET-9.0-purple?style=for-the-badge&logo=dotnet)
 ![Badge](https://img.shields.io/badge/Python-3.10-blue?style=for-the-badge&logo=python)
-![Badge](https://img.shields.io/badge/PaddleOCR-v4-green?style=for-the-badge)
-![Badge](https://img.shields.io/badge/Docker-Microservices-2496ED?style=for-the-badge&logo=docker)
-![Badge](https://img.shields.io/badge/License-MIT-orange?style=for-the-badge)
+![Badge](https://img.shields.io/badge/PaddleOCR-v4-green?style=for-for-the-badge)
+![Badge](https://img.shields.io/badge/Docker-Microservices-2496ED?style=for-for-the-badge&logo=docker)
+![Badge](https://img.shields.io/badge/License-MIT-orange?style=for-for-the-badge)
 
 **Next-Gen Cognitive OCR for Rise of Kingdoms**
 
@@ -35,14 +35,14 @@
     Extracts ID, Name, Power, Kill Points, and Civilization from the profile screen with sub-second latency.
 *   **⚔️ Battle Intelligence**
     Full analysis of PvP and PvE reports, including troop metrics, casualty rates, and boss identification.
-*   **🎒 Inventory Intelligence (NEW)**
-    Reads complex inventory screens (Action Points & XP Books). Supports **Multi-Screenshot Merging** (scrolling) and uses **Color Detection** to distinguish items.
-*   **📐 Warp & Isolate**
-    Automatically detects the report container, removes background noise, and applies perspective correction.
-*   **🎨 Visual Cognitive Engine**
-    Goes beyond text: uses Computer Vision to detect item rarity (colors) and iconic structures, making it resilient to visual noise.
+*   **🎒 Inventory Intelligence**
+    Reads complex inventory screens (Action Points & XP Books). Supports **Multi-Screenshot Merging** and uses **Color Detection** to distinguish items.
+*   **✅ Standardized Output (NEW)**
+    All endpoints now return a unified `RokResponse` structure with a complete **Audit Log** and detailed **Extraction Evidence** for every field.
 *   **🔍 The Magnifier (Auto-Healing)**
     Automatic regional re-scanning with specialized digital filters (White Isolation, Inverted Binary) for low-confidence areas.
+*   **🩺 Debug Mode (NEW)**
+    Add `Debug: true` to any request to receive granular **Timings** per step, **Raw OCR Text**, and **Magnifier Attempt Logs** in the response.
 *   **🌐 Multicultural Core**
     Optimized for Latin alphabets (EN, PT, ES, FR, DE) with smart detection of unsupported characters.
 
@@ -60,7 +60,7 @@ The easiest way to run RoK Vision is using Docker. It sets up the Neural Network
 
 The solution follows a distributed architecture: the **Muscle** (Python) handles the heavy AI computer vision, while the **Brain** (C#) manages the logical orchestration.
 
-```mermaid
+```
 graph LR
     User["Client / Bot"] -->|"POST"| API["API Gateway (.NET 9)"]
     subgraph "The Brain (.NET 9)"
@@ -77,100 +77,85 @@ graph LR
 
 ## 🔌 API Usage
 
+### ⚙️ The Standard Response (`RokResponse<T>`)
+
+Every successful response from the API is wrapped in the `RokResponse<T>` structure, ensuring a consistent contract across all endpoints.
+
+| Field | Type | Description |
+|---|---|---|
+| `status.success` | `bool` | `true` if processing finished without critical error. |
+| `status.overallConfidence`| `float` | Aggregated confidence score from 0 to 100. |
+| `data.summary` | `T` (Model) | The final domain object (e.g., `GovernorProfile`, `ReportResult`) clean and ready to use. |
+| `data.fields` | `Dictionary<string, FieldEvidenceDto>`| **Evidence:** Technical details, confidence, method, and bounding box for each extracted field. |
+| `auditLog` | `List<string>` | Chronological history of decisions made by the OCR Orchestrator. |
+| `debug` | `DebugInformationDto` | **OPTIONAL:** Detailed debug information, only present if `Debug: true` is sent in the request. |
+
 ### 1. Governor Profile
 `POST /api/governor/analyze`  
-Extracts statistics from the governor's profile screen.
+*Requires: `IFormFile Image`, Optional: `int? DraftId`, `bool Debug`*
 
-#### Response (JSON)
-```json
+#### Sample `data.summary` (GovernorProfile)
+```
 {
-  "success": true,
-  "message": "Scan completed successfully.",
-  "data": {
-    "id": 193397278,
-    "name": "nan0z01",
-    "allianceTag": "RE87",
-    "allianceName": "RoyalEmpire",
-    "power": 99999012,
-    "killPoints": 2063935270,
-    "civilization": "Germany",
-    "isSuccessfulRead": true
-  },
-  "processingTimeSeconds": 0.77
+  "id": 193397278,
+  "name": "nan0z01",
+  "allianceTag": "RE87",
+  "power": 99999012,
+  "killPoints": 2063935270,
+  "civilization": "Germany"
 }
 ```
 
 ### 2. Battle Reports
 `POST /api/reports/analyze`  
-Analyzes complex battle logs, identifying if the target is a Player or NPC.
+*Requires: `IFormFile Image`, Optional: `bool Debug`*
 
-#### Sample Response (Battle Report)
-```json
+#### Sample `data.summary` (ReportResult)
+```
 {
-  "success": true,
-  "overallConfidence": 99.5,
-  "data": {
-    "type": "Barbarian",
-    "attacker": { "governorName": "ml Feels", "totalUnits": 7302, "dead": 0 },
-    "defender": { 
-        "isNpc": true, 
-        "governorName": "Lv. 10 Barbarian", 
-        "pveStats": { "damageReceivedPercentage": 43.2 } 
-    }
-  }
+  "type": "SingleBattle_PVP",
+  "attacker": { "governorName": "ml Feels", "totalUnits": 40342, "dead": 0, "severelyWounded": 19287 },
+  "defender": { "governorName": "ITRIOSMANGAZi", "dead": 2451, "remaining": 75785 }
 }
 ```
 
 ### 3. Action Points Inventory
 `POST /api/ap/analyze`  
-Extracts AP items from lists. Supports sending multiple images (scroll) in a single request.
+*Requires: `List<IFormFile> Images`, Optional: `bool Debug`*
 
-#### Response (JSON)
-```json
+#### Sample `data.summary` (ApInventoryData)
+```
 {
-  "success": true,
-  "message": "Success. 4 items identified.",
-  "data": {
-    "grandTotalAp": 338750,
-    "currentBarValue": 875,
-    "items": [
-      {
-        "name": "Basic Action Point Recovery",
-        "apValue": 100,
-        "quantity": 2086,
-        "totalValue": 208600
-      }
-    ],
-    "warnings": ["[Conflict] Basic AP: 155 vs 2086. Using 2086 (Larger Value Logic)."]
-  }
+  "grandTotalAp": 338750,
+  "currentBarValue": 875,
+  "items": [
+    {
+      "name": "Basic Action Point Recovery",
+      "apValue": 100,
+      "quantity": 2086,
+      "confidence": 99.5
+    }
+  ]
 }
 ```
 
-## 4. Experience Inventory (Tomes of Knowledge)
+### 4. Experience Inventory (Tomes of Knowledge)
 `POST /api/xp/analyze`  
-Analyzes the complex "Other" tab grid. Uses color detection to filter out non-XP items.
+*Requires: `List<IFormFile> Images`, Optional: `bool Debug`*
 
-#### Response (JSON)
-```json
+#### Sample `data.summary` (XpInventoryData)
+```
 {
-  "success": true,
-  "data": {
-    "totalXp": 182180300,
-    "items": [
-      {
-        "itemId": "XP_1000",
-        "unitValue": 1000,
-        "quantity": 145964,
-        "detectedColor": "Blue"
-      },
-      {
-        "itemId": "XP_50000",
-        "unitValue": 50000,
-        "quantity": 58,
-        "detectedColor": "Gold"
-      }
-    ]
-  }
+  "totalXp": 182180300,
+  "items": [
+    {
+      "itemId": "XP_50000",
+      "unitValue": 50000,
+      "quantity": 58,
+      "detectedColor": "Gold",
+      "confidence": 98.2
+    }
+  ]
 }
 ```
 

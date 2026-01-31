@@ -1,14 +1,15 @@
+# Path: app/schemas/requests.py
 from pydantic import BaseModel
 from typing import List
 
 class OcrRequest(BaseModel):
     imageBase64: str
 
-# --- NOVOS MODELOS PARA BATCH ---
+# --- NEW BATCH MODELS ---
 class CropRegion(BaseModel):
-    id: str             # Identificador (ex: "node_1")
+    id: str             # Identifier (e.g., "node_1")
     box: List[int]      # [x, y, w, h]
-    strategy: str       # "standard", "binary", "inverted", etc.
+    strategy: str       # "standard", "binary", "inverted", "WhiteIsolation", etc.
 
 class BatchAnalyzeRequest(BaseModel):
     imageBase64: str

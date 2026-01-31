@@ -17,15 +17,19 @@ Before you begin, ensure you have the following installed:
 ### 1. Clone the Repository
 Open your terminal and clone the project:
 
+```
 git clone https://github.com/feels-dev/RokVision.git
 cd RoKVision
+```
 
 ### 2. Build and Run (The Easy Way)
 RoK Vision uses `docker-compose` to orchestrate the Brain (.NET) and the Muscle (Python).
 
 Run the following command to build the images and start the containers:
 
-``docker compose up --build``
+```bash
+docker compose up --build
+```
 
 **Note: The first build might take a few minutes as it downloads the .NET SDK, Python base images, and installs dependencies like PaddleOCR.**
 
@@ -41,20 +45,35 @@ Once the logs stop scrolling and you see "Now listening on...", the services are
 
 ### Option A: Using Swagger (Browser)
 1.  Go to [http://localhost:5000/swagger/index.html](http://localhost:5000/swagger/index.html).
-2.  Expand the endpoint you want to test (e.g., `/api/xp/analyze`).
+2.  Expand the endpoint you want to test (e.g., `/api/governor/analyze`).
 3.  Click **Try it out**.
-4.  Upload one or more screenshots in the `Images` field.
-5.  Click **Execute**.
+4.  In the `Images` field, upload your screenshot.
+5.  **NEW:** Ensure the `Debug` checkbox is marked (or set to `true`) to receive the full processing logs and timers in the response.
+6.  Click **Execute**.
 
-### Option B: Using cURL
-You can test the new Inventory endpoint via terminal:
+### Option B: Using cURL (Including Debug Mode)
+
+Use the following template to test an endpoint, making sure to include the `Debug` flag to get rich debugging output:
 
 ```
+# Governor Profile Example (Single Image)
+curl -X 'POST' \
+  'http://localhost:5000/api/governor/analyze' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: multipart/form-data' \
+  -F 'Image=@/path/to/your/governor_screenshot.jpg' \
+  -F 'Debug=true'
+```
+
+```
+# XP Inventory Example (Multiple Images)
 curl -X 'POST' \
   'http://localhost:5000/api/xp/analyze' \
-  -H 'accept: text/plain' \
+  -H 'accept: application/json' \
   -H 'Content-Type: multipart/form-data' \
-  -F 'Images=@/path/to/your/screenshot.jpg'
+  -F 'Images=@/path/to/xp_scroll_1.jpg' \
+  -F 'Images=@/path/to/xp_scroll_2.jpg' \
+  -F 'Debug=true'
 ```
 
 ---
@@ -78,7 +97,7 @@ If ports `5000` or `8000` are already in use on your machine, change the **left 
 
 ```
 ports:
-  - "9090:8080" # Maps local 9090 to container 8080
+  - "9090:5000" # Maps local 9090 to container 5000
 ```
 
 ---
@@ -97,4 +116,3 @@ Ensure both containers are running in the same network. The project uses a defau
 ```
 docker logs rok-ocr-api
 ```
-

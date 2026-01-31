@@ -45,7 +45,7 @@ builder.Services.AddScoped<GovernorOrchestrator>();
 
 // Feature: Reports
 builder.Services.AddScoped<WarMagnifier>();
-builder.Services.AddScoped<ReportScoreCalculator>(); // <--- NEW SERVICE REGISTERED
+builder.Services.AddScoped<ReportScoreCalculator>();
 builder.Services.AddScoped<ReportOrchestrator>();
 
 builder.Services.AddScoped<ApMagnifier>();

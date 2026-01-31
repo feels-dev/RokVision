@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using RoK.Ocr.Domain.Interfaces;
 using RoK.Ocr.Domain.Models;
+using RoK.Ocr.Application.Common.Models; // Important
 
 namespace RoK.Ocr.Application.Features.ActionPoints.Services;
 
@@ -19,9 +20,15 @@ public class ApMagnifier
         _logger = logger;
     }
 
-    public async Task<List<OcrBlock>> RescanQuantitiesAsync(string imagePath, List<AnalyzedBlock> lowConfidenceBlocks)
+    public async Task<List<OcrBlock>> RescanQuantitiesAsync(string imagePath, List<AnalyzedBlock> lowConfidenceBlocks, OcrAnalysisContext context)
     {
-        if (!lowConfidenceBlocks.Any()) return new List<OcrBlock>();
+        context.StartTimer("ApMagnifierBatch"); // Time Magnifier
+        
+        if (!lowConfidenceBlocks.Any()) 
+        {
+            context.StopTimer("ApMagnifierBatch");
+            return new List<OcrBlock>();
+        }
 
         var batchRequests = new List<(string Id, int[] Box, string Strategy)>();
 
@@ -40,9 +47,12 @@ public class ApMagnifier
             batchRequests.Add(($"{block.Raw.Text}_bin", new[] { x, y, w, h }, "HighContrastBinary"));
         }
 
-        _logger.LogInformation("[ApMagnifier] Sending {Count} regions for re-analysis.", batchRequests.Count);
+        context.Log($"[ApMagnifier] Sending {batchRequests.Count} regions for re-analysis.");
 
         var results = await _ocrService.AnalyzeBatchAsync(imagePath, batchRequests);
+
+        context.StopTimer("ApMagnifierBatch"); // Stop timer
+        context.Log($"[ApMagnifier] Batch finished. Found {results.Count} candidates.");
 
         return results
             .Where(r => r.Confidence > 0.75 && r.Text.Any(char.IsDigit))

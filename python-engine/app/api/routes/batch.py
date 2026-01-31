@@ -1,3 +1,4 @@
+# Path: app/api/routes/batch.py
 from fastapi import APIRouter, HTTPException
 from app.schemas.requests import BatchAnalyzeRequest
 from app.services.image_processing import ImageProcessor

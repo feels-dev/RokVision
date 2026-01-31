@@ -10,6 +10,8 @@ using RoK.Ocr.Application.Features.Experience.Neurons;
 using RoK.Ocr.Application.Features.Experience.Services;
 using RoK.Ocr.Domain.Interfaces;
 using RoK.Ocr.Domain.Models.Experience;
+using RoK.Ocr.Application.Common.Models; // Import Context
+using RoK.Ocr.Domain.Models; // For ExtractionResult Helper
 
 namespace RoK.Ocr.Application.Features.Experience.Orchestrator;
 
@@ -18,12 +20,12 @@ public class XpOrchestrator
     private readonly IOcrService _ocrService;
     private readonly IImageStorage _storage;
     private readonly ILogger<XpOrchestrator> _logger;
-    private readonly XpMagnifier _magnifier; 
+    private readonly XpMagnifier _magnifier;
     private readonly XpGridNeuron _gridNeuron = new();
 
     public XpOrchestrator(
-        IOcrService ocrService, 
-        IImageStorage storage, 
+        IOcrService ocrService,
+        IImageStorage storage,
         ILogger<XpOrchestrator> logger,
         XpMagnifier magnifier)
     {
@@ -33,131 +35,140 @@ public class XpOrchestrator
         _magnifier = magnifier;
     }
 
-    public async Task<(XpInventoryData Data, string RawText)> ProcessXpAsync(List<IFormFile> images)
+    public async Task<(XpInventoryData Data, OcrAnalysisContext Context)> ProcessXpAsync(List<IFormFile> images, bool debugMode = false)
     {
         var finalData = new XpInventoryData();
         var itemTracker = new Dictionary<string, XpItemEntry>();
-        var rawTextBuilder = new System.Text.StringBuilder();
+        var context = new OcrAnalysisContext(); 
+        context.StartTimer("TotalOrchestration"); // Total Timer
+
+        context.Log($"Starting XP inventory analysis for {images.Count} images.");
+
         int imgIndex = 0;
 
         foreach (var image in images)
         {
             imgIndex++;
+            context.StartTimer($"Image_{imgIndex}_Total"); // Timer per Image
+
             string tempPath = "";
             try
             {
+                // 1. Save and OCR
+                context.StartTimer($"Image_{imgIndex}_Storage");
                 using (var stream = image.OpenReadStream())
                     tempPath = await _storage.SaveImageAsync(stream, image.FileName);
+                context.StopTimer($"Image_{imgIndex}_Storage");
 
-                // 1. Initial OCR
+                context.StartTimer($"Image_{imgIndex}_Python");
                 var (rawBlocks, fullText) = await _ocrService.AnalyzeInventoryAsync(tempPath);
-                
-                if (rawTextBuilder.Length > 0) rawTextBuilder.Append(" | ");
-                rawTextBuilder.Append($"[IMG {imgIndex}] {fullText}");
+                context.StopTimer($"Image_{imgIndex}_Python");
 
+                context.Log($"[IMG {imgIndex}] OCR Scan Complete. Found {rawBlocks?.Count ?? 0} blocks.");
+                
+                // Log RawText in Debug
+                if (debugMode && fullText.Length > 0)
+                {
+                    context.DebugInfo.RawText += $"--- IMG {imgIndex} ---\n{fullText}\n";
+                }
+                
                 if (rawBlocks == null || !rawBlocks.Any()) continue;
 
+                // 2. Initial Extraction
+                context.StartTimer($"Image_{imgIndex}_Logic");
                 var nodes = BlockClassifier.Classify(rawBlocks);
-                
-                // Debugging Colors - Uncomment in XpInventoryData if needed
-                // foreach (var node in nodes)
-                // {
-                //     if (node.Raw.Text.Any(char.IsDigit))
-                //     {
-                //         finalData.BlockDebug.Add($"Text: '{node.Raw.Text}' | Color: '{node.Raw.DominantColor}' | Conf: {node.Raw.Confidence:P0}");
-                //     }
-                // }
-
-                // 2. Initial Extraction (Grid Neuron)
                 var itemsFound = _gridNeuron.Extract(nodes);
-
-                // --- BLACKLIST CREATION ---
-                // If XpGridNeuron found a value (e.g., '1092') with high confidence, 
-                // we blacklist it so the Magnifier doesn't erroneously fill gaps with this neighbor's value.
-                var blacklistValues = new HashSet<int>();
-                foreach (var item in itemsFound.Where(i => i.Quantity > -1))
-                {
-                    blacklistValues.Add(item.Quantity);
-                }
+                context.Log($"[IMG {imgIndex}] Initial extraction found {itemsFound.Count} potential items.");
 
                 // 3. KEY STEP: Call the Magnifier (Sniper Mode)
-                await _magnifier.ResolveMissingQuantitiesAsync(tempPath, itemsFound);
+                // Passing Context
+                await _magnifier.ResolveMissingQuantitiesAsync(tempPath, itemsFound, context); 
 
-                // --- SANITY CHECK (Post-Magnifier Filter) ---
-                // Verification logic to ensure the Magnifier didn't read a neighbor's value (Ghost Read).
-                foreach (var item in itemsFound)
-                {
-                    // If we have duplicate large numbers (e.g., two items with 1092), it's likely a read error
-                    // caused by the Magnifier looking too far and picking up the neighbor's text.
-                    
-                    int count = itemsFound.Count(i => i.Quantity == item.Quantity);
-                    if (count > 1 && item.Quantity > 10) // Ignore common small numbers (1, 2, 5)
-                    {
-                        // Strategy: Ideally, identify the "weakest link" (lowest confidence) and mark as invalid.
-                        // Currently, we log a warning and rely on the Global Merge to resolve conflicts 
-                        // if multiple images are present.
-                    }
-                }
+                // --- SANITY CHECK & Merge Logic ---
+                int recoveredCount = 0;
                 
-                // 4. Merge Logic
                 foreach (var item in itemsFound)
                 {
-                    // --- SPATIAL DUPLICATE FILTER ---
-                    // If this item has the SAME quantity as another item ALREADY PROCESSED in this image
-                    // and it's a specific/large number, discard it.
-                    // Example: Prevents XP_5000 from being set to 1092 if XP_10000 already claimed 1092.
-                    
-                    bool isDuplicateValue = itemsFound.Any(other => 
-                        other != item && 
-                        other.Quantity == item.Quantity && 
-                        other.Quantity > 150 && // Tolerance for common numbers
-                        other.Confidence > item.Confidence // The other one is more reliable
+                    string fieldKey = $"xp_{item.ItemId}";
+
+                    // Spatial Duplicate Filter
+                    bool isDuplicateValue = itemsFound.Any(other =>
+                        other != item && other.Quantity == item.Quantity && other.Quantity > 150 && other.Confidence > item.Confidence
                     );
 
                     if (isDuplicateValue)
                     {
-                        finalData.Warnings.Add($"[Sanity Check] Discarded {item.ItemId} with value {item.Quantity} because it duplicates a higher confidence neighbor (Ghost Read).");
+                        context.LogWarning("WARN_GHOST_READ", $"Discarded {item.ItemId} (Qty: {item.Quantity}) because it duplicates a higher confidence neighbor (Ghost Read).", fieldKey);
                         continue;
                     }
 
-                    if (item.Quantity == -1) 
+                    if (item.Quantity == -1)
                     {
-                        finalData.Warnings.Add($"[Ignored] Could not read quantity for {item.ItemId} (Color: {item.DetectedColor}).");
+                        context.LogWarning("WARN_QUANTITY_MISSING", $"Could not read quantity for {item.ItemId} (Color: {item.DetectedColor}).", fieldKey);
                         continue;
                     }
-
-                    if (itemTracker.TryGetValue(item.ItemId, out var existing))
+                    
+                    if (item.Confidence > 0)
                     {
-                        if (existing.Quantity != item.Quantity)
-                        {
-                            bool useNew = item.Quantity > existing.Quantity; // Highest value wins strategy
-                            finalData.Warnings.Add($"[Conflict] {item.ItemId}: {existing.Quantity} vs {item.Quantity}. Using {(useNew ? item.Quantity : existing.Quantity)}.");
+                        recoveredCount++; // Count items successfully extracted or confirmed
 
-                            if (useNew) itemTracker[item.ItemId] = item;
-                        }
-                        else if (item.Confidence > existing.Confidence)
+                        if (itemTracker.TryGetValue(item.ItemId, out var existing))
                         {
-                            itemTracker[item.ItemId] = item;
+                            if (existing.Quantity != item.Quantity)
+                            {
+                                bool useNew = item.Quantity > existing.Quantity; 
+                                context.LogWarning("WARN_ITEM_CONFLICT", $"Item '{item.ItemId}' conflict. Values: {existing.Quantity} vs {item.Quantity}. Using {(useNew ? item.Quantity : existing.Quantity)}.", fieldKey);
+
+                                if (useNew) { itemTracker[item.ItemId] = item; context.RegisterResult(fieldKey, CreateExtractionResult(item), "XpItemNeuron_Conflict_New"); }
+                            }
+                            else if (item.Confidence > existing.Confidence)
+                            {
+                                itemTracker[item.ItemId] = item; context.RegisterResult(fieldKey, CreateExtractionResult(item), "XpItemNeuron_Confidence_Update");
+                            }
                         }
-                    }
-                    else
-                    {
-                        itemTracker.Add(item.ItemId, item);
+                        else
+                        {
+                            itemTracker.Add(item.ItemId, item); context.RegisterResult(fieldKey, CreateExtractionResult(item), "XpItemNeuron_New");
+                        }
                     }
                 }
+                
+                // Register Magnifier result
+                if (debugMode)
+                {
+                    // Since ResolveMissingQuantitiesAsync modifies itemsFound in-place, simple count suffices.
+                    context.RegisterMagnifierAttempt($"Image {imgIndex} XP Resolution", 1, $"Recovered {recoveredCount} items", recoveredCount > 0);
+                }
+                
+                context.StopTimer($"Image_{imgIndex}_Logic");
             }
             catch (Exception ex)
             {
+                context.LogError($"[System Error] Failed to process image {image.FileName}: {ex.Message}");
                 _logger.LogError(ex, "Error processing XP image.");
-                finalData.Warnings.Add($"Error on image {imgIndex}: {ex.Message}");
             }
             finally
             {
                 if (!string.IsNullOrEmpty(tempPath)) _storage.DeleteImage(tempPath);
+                context.StopTimer($"Image_{imgIndex}_Total");
             }
         }
 
-        finalData.Items = itemTracker.Values.OrderBy(i => i.UnitValue).ToList();
-        return (finalData, rawTextBuilder.ToString());
+        finalData.Items = itemTracker.Values.OrderByDescending(i => i.Confidence).ToList(); 
+
+        context.StopTimer("TotalOrchestration");
+        context.AuditLog.Add($"[INFO] Final XP Inventory Confidence: {finalData.Items.Average(i => i.Confidence):F2}%");
+
+        return (finalData, context);
+    }
+
+    private ExtractionResult<XpItemEntry> CreateExtractionResult(XpItemEntry item)
+    {
+        return new ExtractionResult<XpItemEntry>
+        {
+            Value = item,
+            Confidence = item.Confidence,
+            SourceBlock = null
+        };
     }
 }

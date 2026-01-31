@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using RoK.Ocr.Api.Dtos.Experience;
 using RoK.Ocr.Application.Features.Experience.Orchestrator;
+using RoK.Ocr.Domain.Models.Experience;
 using System.Diagnostics;
+using RoK.Ocr.Application.Common.Dtos; 
+using System.Linq;
 
 namespace RoK.Ocr.Api.Controllers;
 
@@ -20,34 +23,50 @@ public class ExperienceController : ControllerBase
 
     [HttpPost("analyze")]
     [Consumes("multipart/form-data")]
-    [ProducesResponseType(typeof(XpApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(RokResponse<XpInventoryData>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Analyze([FromForm] XpUploadRequest request)
     {
-        var sw = Stopwatch.StartNew();
+        var swGlobal = Stopwatch.StartNew(); 
 
         if (request.Images == null || !request.Images.Any())
-            return BadRequest(new XpApiResponse { Success = false, Message = "No images provided." });
+            return BadRequest(ResponseFactory.CreateFailure<XpInventoryData>("No images provided.", "ERR_NO_IMAGES", 400)); 
 
         try
         {
-            var (data, rawText) = await _orchestrator.ProcessXpAsync(request.Images);
-            sw.Stop();
+            // Passing debug flag
+            var (data, context) = await _orchestrator.ProcessXpAsync(request.Images, request.Debug);
+            swGlobal.Stop();
 
-            return Ok(new XpApiResponse
+            // OVERALL CONFIDENCE CALCULATION
+            double overallConf = data.Items.Any() 
+                ? data.Items.Average(i => i.Confidence) 
+                : 0.0;
+
+            var response = ResponseFactory.CreateSuccess(
+                summary: data,
+                fields: context.Evidence,
+                auditLog: context.AuditLog,
+                processingTime: swGlobal.Elapsed.TotalSeconds,
+                overallConfidence: overallConf,
+                warnings: context.Warnings
+            );
+
+            // Attaching Debug if flag is active
+            if (request.Debug)
             {
-                Success = true,
-                Message = data.Items.Any() 
-                    ? $"Success. {data.Items.Count} XP book types found." 
-                    : "Analysis complete. No XP books found.",
-                ProcessingTimeSeconds = Math.Round(sw.Elapsed.TotalSeconds, 3),
-                RawText = rawText,
-                Data = data
-            });
+                response.Debug = context.DebugInfo;
+            }
+            else
+            {
+                response.Debug = null;
+            }
+
+            return Ok(response);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "XP Endpoint Error");
-            return StatusCode(500, new XpApiResponse { Success = false, Message = ex.Message });
+            return StatusCode(500, ResponseFactory.CreateFailure<XpInventoryData>($"Internal Server Error: {ex.Message}")); 
         }
     }
 }

@@ -1,3 +1,4 @@
+# Path: app/api/routes/inventory.py
 from fastapi import APIRouter, HTTPException
 from app.schemas.requests import OcrRequest
 from app.services.image_processing import ImageProcessor

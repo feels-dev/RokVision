@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using RoK.Ocr.Api.Dtos.ActionPoints;
+using RoK.Ocr.Application.Common.Dtos;
 using RoK.Ocr.Application.Features.ActionPoints.Orchestrator;
+using RoK.Ocr.Domain.Models.ActionPoints;
 using System.Diagnostics;
+using System.Linq;
 
 namespace RoK.Ocr.Api.Controllers;
 
@@ -20,51 +23,55 @@ public class ActionPointsController : ControllerBase
 
     [HttpPost("analyze")]
     [Consumes("multipart/form-data")]
-    [ProducesResponseType(typeof(ApApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(RokResponse<ApInventoryData>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Analyze([FromForm] ApUploadRequest request)
     {
-        var sw = Stopwatch.StartNew();
+        var swGlobal = Stopwatch.StartNew();
 
         if (request.Images == null || !request.Images.Any())
         {
-            return BadRequest(new ApApiResponse 
-            { 
-                Success = false, 
-                Message = "No images provided in the request." 
-            });
+            return BadRequest(ResponseFactory.CreateFailure<ApInventoryData>("No images provided in the request.", "ERR_NO_IMAGES", 400));
         }
 
         try
         {
             _logger.LogInformation("Receiving {Count} AP inventory images for analysis.", request.Images.Count);
 
-            var (inventoryData, rawText) = await _orchestrator.ProcessInventoryAsync(request.Images);
+            // Passing the debug flag
+            var (inventoryData, context) = await _orchestrator.ProcessInventoryAsync(request.Images, request.Debug);
 
-            sw.Stop();
+            swGlobal.Stop();
 
-            var response = new ApApiResponse
+            // Overall Confidence Calculation (Uses what was logged in Context)
+            double overallConf = inventoryData.Items.Any()
+                ? inventoryData.Items.Average(i => i.Confidence)
+                : 0.0;
+
+            var response = ResponseFactory.CreateSuccess(
+                summary: inventoryData,
+                fields: context.Evidence,
+                auditLog: context.AuditLog,
+                processingTime: swGlobal.Elapsed.TotalSeconds,
+                overallConfidence: overallConf,
+                warnings: context.Warnings
+            );
+
+            // Attaching Debug info if flag is active
+            if (request.Debug)
             {
-                Success = true,
-                Message = inventoryData.Items.Any() 
-                    ? $"Analysis complete. {inventoryData.Items.Count} item types identified." 
-                    : "Analysis complete, but no standard items were identified.",
-                
-                ProcessingTimeSeconds = Math.Round(sw.Elapsed.TotalSeconds, 3),
-                RawText = rawText, 
-                Data = inventoryData
-            };
+                response.Debug = context.DebugInfo;
+            }
+            else
+            {
+                response.Debug = null;
+            }
 
             return Ok(response);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Critical error in Action Points endpoint.");
-            return StatusCode(500, new ApApiResponse 
-            { 
-                Success = false, 
-                Message = $"Internal Server Error: {ex.Message}",
-                RawText = "Log unavailable due to critical failure."
-            });
+            return StatusCode(500, ResponseFactory.CreateFailure<ApInventoryData>($"Internal Server Error: {ex.Message}"));
         }
     }
 }

@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-01-31
+
+### Added
+- **Global Debug Mode**: Added optional `Debug: true` parameter to ALL API endpoints (`/governor`, `/reports`, `/ap`, `/xp`).
+  - Enables rich output, including **Raw OCR Text** for all processed images.
+  - Adds detailed **Timings** per processing step (`TotalOrchestration`, `PythonInitialRead`, `Classification`, `MagnifierBatchRepair`, etc.).
+  - Logs detected **Anchors** (e.g., `PowerLabel`, `CivLabel`) for easy contextual validation.
+  - Logs detailed status and success rate of **Magnifier/Batch Repair** attempts.
+- **Instrumented Magnifier**: `GovernorMagnifier` and `WarMagnifier` now report their full execution state and success strategies to the `OcrAnalysisContext`.
+
+### Changed
+- **Unified Response Structure**: The API response has been standardized across **all** endpoints to the `RokResponse<T>` pattern.
+  - **BREAKING CHANGE (Minor):** The `debug` field is now an object (`DebugInformationDto`) and is only present if `Debug: true` is requested. If `false`, it returns `null` or is omitted.
+  - **Consistency:** All controllers (`GovernorController`, `ReportController`, `ActionPointsController`, `ExperienceController`) are refactored to use the unified audit context and response factory.
+- **Improved Logging**: `OcrAnalysisContext` logic is enhanced with new `StartTimer`/`StopTimer` methods for precise measurement of all internal components.
+
+---
+
 ## [0.3.0] - 2025-12-26
 
 ### Added

@@ -1,3 +1,4 @@
+# Path: app/api/routes/governor.py
 from fastapi import APIRouter, HTTPException
 from app.schemas.requests import OcrRequest
 from app.services.image_processing import ImageProcessor
@@ -11,7 +12,7 @@ async def analyze_governor(request: OcrRequest):
     if img is None:
         raise HTTPException(status_code=400, detail="Invalid Image")
 
-    # Resize otimiza muito o tempo de inferência do Paddle
+    # Resize greatly optimizes Paddle inference time
     img_resized, ratio = ImageProcessor.resize_if_needed(img, max_width=1280)
 
     ocr = OcrEngine.get_instance()
@@ -22,8 +23,8 @@ async def analyze_governor(request: OcrRequest):
 
     if result and result[0]:
         for line in result[0]:
-            # Recupera as coordenadas originais multiplicando pelo ratio
-            # Isso é opcional, mas bom se o C# desenhar caixas na imagem original
+            # Recover original coordinates by dividing by ratio
+            # This is optional, but useful if C# draws boxes on the original image
             box = line[0]
             if ratio != 1.0:
                  box = [[pt[0]/ratio, pt[1]/ratio] for pt in box]

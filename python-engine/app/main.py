@@ -1,3 +1,4 @@
+# Path: app/main.py
 import logging
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
@@ -12,10 +13,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Lifespan Events (Novo jeito do FastAPI gerenciar Startup/Shutdown)
+# Lifespan Events (New way FastAPI manages Startup/Shutdown)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Força o carregamento do modelo na memória
+    # Startup: Forces model loading into memory
     logger.info("♻️ Warming up OCR Engine...")
     OcrEngine.get_instance()
     yield
