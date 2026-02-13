@@ -60,7 +60,7 @@ The easiest way to run RoK Vision is using Docker. It sets up the Neural Network
 
 The solution follows a distributed architecture: the **Muscle** (Python) handles the heavy AI computer vision, while the **Brain** (C#) manages the logical orchestration.
 
-```
+```mermaid
 graph LR
     User["Client / Bot"] -->|"POST"| API["API Gateway (.NET 9)"]
     subgraph "The Brain (.NET 9)"

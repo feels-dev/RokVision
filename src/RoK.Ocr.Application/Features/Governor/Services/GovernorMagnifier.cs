@@ -16,45 +16,45 @@ public class GovernorMagnifier
 {
     private readonly IOcrService _ocrService;
     private readonly IImageStorage _storage;
-    private readonly string _webRoot; 
+    private readonly string _webRoot;
     private readonly string _tempPath;
     private readonly string _debugPath;
-    
-    private const bool EnableDebugMode = true; 
+
+    private const bool EnableDebugMode = true;
 
     public GovernorMagnifier(IOcrService ocrService, IImageStorage storage)
     {
         _ocrService = ocrService;
         _storage = storage;
         _webRoot = _storage.GetBasePath();
-        
+
         _tempPath = Path.Combine(_webRoot, "uploads", "temp_crops");
         _debugPath = Path.Combine(_webRoot, "uploads", "debug_crops");
-        
+
         if (!Directory.Exists(_tempPath)) Directory.CreateDirectory(_tempPath);
         if (EnableDebugMode && !Directory.Exists(_debugPath)) Directory.CreateDirectory(_debugPath);
     }
 
     public async Task<List<OcrBlock>> HuntForField(
-        string imagePath, 
-        AnalyzedBlock anchor, 
-        string fieldType, 
+        string imagePath,
+        AnalyzedBlock anchor,
+        string fieldType,
         OcrAnalysisContext context)
     {
         // Start specific timer for this field
         context.StartTimer($"Magnifier_{fieldType}");
 
         var strategies = GetHuntingStrategies(fieldType);
-        
+
         var anchorRect = new Rect(
-            anchor.Raw.Box[0][0], 
-            anchor.Raw.Box[0][1], 
-            anchor.Raw.Box[1][0] - anchor.Raw.Box[0][0], 
+            anchor.Raw.Box[0][0],
+            anchor.Raw.Box[0][1],
+            anchor.Raw.Box[1][0] - anchor.Raw.Box[0][0],
             anchor.Raw.Box[2][1] - anchor.Raw.Box[0][1]
         );
 
         string huntId = DateTime.Now.ToString("HHmmss");
-        
+
         // Debug Log Variables
         int strategiesTried = 0;
         string? winningStrategy = null;
@@ -68,25 +68,23 @@ public class GovernorMagnifier
             {
                 strategiesTried++;
                 string cropPathAbsolute = "";
-                
+
                 try
                 {
                     Console.WriteLine($"[GovernorMagnifier] Trying strategy: {strategy.Name}");
 
                     var roi = strategy.CalculateRegion(anchorRect);
-                    
+
                     cropPathAbsolute = await CreateSmartCrop(imagePath, roi, strategy);
 
-                    if (string.IsNullOrEmpty(cropPathAbsolute)) 
+                    if (string.IsNullOrEmpty(cropPathAbsolute))
                     {
                         Console.WriteLine("[GovernorMagnifier] Failure: Invalid crop region.");
                         continue;
                     }
 
-                    string relativePath = Path.GetRelativePath(_webRoot, cropPathAbsolute);
+                    var result = await _ocrService.AnalyzeImageAsync(cropPathAbsolute);
 
-                    var result = await _ocrService.AnalyzeImageAsync(relativePath);
-                    
                     bool isSuccess = false;
                     string readText = "EMPTY";
 
@@ -113,7 +111,7 @@ public class GovernorMagnifier
                         string status = isSuccess ? "HIT" : "MISS";
                         string debugFilename = $"{huntId}_{fieldType}_{strategy.Name}_{status}_[{filenameSafe}].png";
                         string debugDest = Path.Combine(_debugPath, debugFilename);
-                        
+
                         File.Copy(cropPathAbsolute, debugDest, true);
                     }
 
@@ -121,7 +119,7 @@ public class GovernorMagnifier
                     {
                         finalSuccess = true;
                         winningStrategy = strategy.Name;
-                        
+
                         // Log success in context
                         context.Log($"[Magnifier] Hit on {fieldType} using {strategy.Name}: '{readText}'");
 
@@ -136,7 +134,7 @@ public class GovernorMagnifier
                 finally
                 {
                     // Cleanup temporary file
-                    if (!string.IsNullOrEmpty(cropPathAbsolute) && File.Exists(cropPathAbsolute)) 
+                    if (!string.IsNullOrEmpty(cropPathAbsolute) && File.Exists(cropPathAbsolute))
                     {
                         try { File.Delete(cropPathAbsolute); } catch { }
                     }
@@ -163,14 +161,14 @@ public class GovernorMagnifier
             list.Add(new SearchStrategy
             {
                 Name = "1_Civ_Inverted_Binary",
-                ScaleFactor = 2.0, 
+                ScaleFactor = 2.0,
                 CalculateRegion = (r) => new Rect(r.X - 20, r.Y - 15, r.Width + 800, 300),
-                ApplyFilters = (ctx) => 
+                ApplyFilters = (ctx) =>
                 {
                     ctx.Resize(ctx.GetCurrentSize().Width * 2, ctx.GetCurrentSize().Height * 2);
                     ctx.Invert();
                     ctx.Grayscale();
-                    ctx.BinaryThreshold(0.6f); 
+                    ctx.BinaryThreshold(0.6f);
                 }
             });
 
@@ -179,31 +177,35 @@ public class GovernorMagnifier
                 Name = "2_Civ_Normal_Sharpen",
                 ScaleFactor = 2.0,
                 CalculateRegion = (r) => new Rect(r.X - 20, r.Y - 15, r.Width + 800, 300),
-                ApplyFilters = (ctx) => 
+                ApplyFilters = (ctx) =>
                 {
                     ctx.Resize(ctx.GetCurrentSize().Width * 2, ctx.GetCurrentSize().Height * 2);
-                    ctx.GaussianSharpen(1.0f); 
+                    ctx.GaussianSharpen(1.0f);
                 }
             });
         }
         else if (fieldType == "Power" || fieldType == "KillPoints")
         {
-            list.Add(new SearchStrategy {
+            list.Add(new SearchStrategy
+            {
                 Name = "1_Stat_Below_Binary",
                 ScaleFactor = 2.0,
                 CalculateRegion = (r) => new Rect(r.X - 20, r.Y + (r.Height * 0.5), r.Width + 300, 300),
-                ApplyFilters = (ctx) => {
+                ApplyFilters = (ctx) =>
+                {
                     ctx.Resize(ctx.GetCurrentSize().Width * 2, ctx.GetCurrentSize().Height * 2);
                     ctx.Grayscale();
-                    ctx.BinaryThreshold(0.5f); 
+                    ctx.BinaryThreshold(0.5f);
                 }
             });
 
-            list.Add(new SearchStrategy {
+            list.Add(new SearchStrategy
+            {
                 Name = "2_Stat_Wide_Contrast",
                 ScaleFactor = 1.5,
                 CalculateRegion = (r) => new Rect(r.X - 50, r.Y - 10, r.Width + 400, 300),
-                ApplyFilters = (ctx) => {
+                ApplyFilters = (ctx) =>
+                {
                     ctx.Resize((int)(ctx.GetCurrentSize().Width * 1.5), (int)(ctx.GetCurrentSize().Height * 1.5));
                     ctx.Grayscale();
                     ctx.Contrast(1.5f);
@@ -212,7 +214,8 @@ public class GovernorMagnifier
         }
         else if (fieldType == "Name")
         {
-             list.Add(new SearchStrategy {
+            list.Add(new SearchStrategy
+            {
                 Name = "1_Name_Panorama",
                 ScaleFactor = 2.0,
                 CalculateRegion = (r) => new Rect(r.X - 150, r.Y + r.Height, r.Width + 500, 300),
@@ -221,11 +224,46 @@ public class GovernorMagnifier
         }
         else if (fieldType == "Alliance")
         {
-            list.Add(new SearchStrategy {
+            list.Add(new SearchStrategy
+            {
                 Name = "1_Alliance_Panorama",
                 ScaleFactor = 2.0,
                 CalculateRegion = (r) => new Rect(r.X - 50, r.Y + (r.Height * 0.5), r.Width + 500, 300),
                 ApplyFilters = (ctx) => ctx.Resize(ctx.GetCurrentSize().Width * 2, ctx.GetCurrentSize().Height * 2)
+            });
+        }
+        else if (fieldType == "ID")
+        {
+            // Estratégia 1: Foco em contraste alto e binarização (ID costuma ser branco pequeno)
+            list.Add(new SearchStrategy
+            {
+                Name = "1_ID_Standard_Binary",
+                ScaleFactor = 2.5, // Zoom maior pois números de ID são pequenos
+                                   // Região: Pega a âncora (ex: "Governador"), move um pouco pra baixo (+ Height * 0.5)
+                                   // e estende para a direita e para baixo.
+                CalculateRegion = (r) => new Rect(r.X - 10, r.Y + (r.Height * 0.5), r.Width + 250, 120),
+                ApplyFilters = (ctx) =>
+                {
+                    ctx.Resize(ctx.GetCurrentSize().Width * 3, ctx.GetCurrentSize().Height * 3);
+                    ctx.Grayscale();
+                    ctx.Contrast(1.4f); // Aumenta contraste
+                    ctx.BinaryThreshold(0.6f); // Deixa preto e branco agressivo
+                }
+            });
+
+            // Estratégia 2: Invertida (caso fundo seja claro e letra escura, ou falha na binarização normal)
+            list.Add(new SearchStrategy
+            {
+                Name = "2_ID_Inverted",
+                ScaleFactor = 2.0,
+                CalculateRegion = (r) => new Rect(r.X - 10, r.Y + (r.Height * 0.5), r.Width + 250, 120),
+                ApplyFilters = (ctx) =>
+                {
+                    ctx.Resize(ctx.GetCurrentSize().Width * 2, ctx.GetCurrentSize().Height * 2);
+                    ctx.Invert();
+                    ctx.Grayscale();
+                    ctx.BinaryThreshold(0.5f);
+                }
             });
         }
 
@@ -242,13 +280,13 @@ public class GovernorMagnifier
             int y = Math.Max(0, (int)roi.Y);
             int w = Math.Min((int)roi.Width, image.Width - x);
             int h = Math.Min((int)roi.Height, image.Height - y);
-            
+
             if (w <= 10 || h <= 10) return string.Empty;
 
-            image.Mutate(ctx => 
+            image.Mutate(ctx =>
             {
                 ctx.Crop(new Rectangle(x, y, w, h));
-                strategy.ApplyFilters(ctx); 
+                strategy.ApplyFilters(ctx);
             });
 
             await image.SaveAsPngAsync(cropFile);
@@ -262,7 +300,7 @@ public class GovernorMagnifier
         foreach (var raw in rawBlocks)
         {
             double factor = scaleFactor > 0 ? scaleFactor : 1;
-            
+
             double localX1 = raw.Box[0][0] / factor;
             double localY1 = raw.Box[0][1] / factor;
             double localX2 = raw.Box[2][0] / factor;
@@ -296,9 +334,9 @@ public class GovernorMagnifier
     private class SearchStrategy
     {
         public string Name { get; set; } = "Default";
-        public double ScaleFactor { get; set; } = 1.0; 
-        public Func<Rect, Rect> CalculateRegion { get; set; } = r => r; 
-        public Action<IImageProcessingContext> ApplyFilters { get; set; } = _ => {};
+        public double ScaleFactor { get; set; } = 1.0;
+        public Func<Rect, Rect> CalculateRegion { get; set; } = r => r;
+        public Action<IImageProcessingContext> ApplyFilters { get; set; } = _ => { };
     }
 
     private record Rect(double X, double Y, double Width, double Height);

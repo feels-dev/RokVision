@@ -4,8 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using RoK.Ocr.Application.Common.Cognitive;
 using RoK.Ocr.Application.Common.Interfaces;
-using RoK.Ocr.Application.Common.Models; 
-using RoK.Ocr.Application.Common.Dtos;   
+using RoK.Ocr.Application.Common.Models;
+using RoK.Ocr.Application.Common.Dtos;
 using RoK.Ocr.Application.Features.Governor.Neurons;
 using RoK.Ocr.Application.Features.Governor.Services;
 using RoK.Ocr.Domain.Constants;
@@ -30,14 +30,14 @@ public class GovernorOrchestrator
     }
 
     public async Task<(GovernorProfile Profile, OcrAnalysisContext Context)> AnalyzeAsync(
-        string imagePath, 
-        List<OcrBlock> rawBlocks, 
+        string imagePath,
+        List<OcrBlock> rawBlocks,
         int draftId = 0)
     {
         // 1. Initialize Audit Context and Total Timer
         var context = new OcrAnalysisContext();
         context.StartTimer("TotalOrchestration");
-        
+
         context.Log($"Starting orchestration for image: {System.IO.Path.GetFileName(imagePath)}");
 
         var finalData = new GovernorProfile();
@@ -47,7 +47,7 @@ public class GovernorOrchestrator
         context.Log($"Classifying {rawBlocks.Count} raw blocks...");
         var analyzedBlocks = BlockClassifier.Classify(rawBlocks);
         context.StopTimer("Classification");
-        
+
         int attempts = 0;
         bool keepTrying = true;
 
@@ -70,7 +70,7 @@ public class GovernorOrchestrator
             // 1. ID
             // ---------------------------------------------------------
             var idResult = RunNeuronWithRetry(_idNeuron, analyzedBlocks, anchors, 0, usedBlocks);
-            
+
             if (idResult.IsSuccess)
             {
                 finalData.Id = idResult.Value;
@@ -81,7 +81,7 @@ public class GovernorOrchestrator
                 }
                 context.RegisterResult("id", idResult, "IdNeuron");
             }
-            else 
+            else
             {
                 finalData.Id = draftId;
                 context.LogWarning("WARN_ID_NOT_FOUND", "ID could not be read. Using Draft/Zero.", "id");
@@ -95,7 +95,7 @@ public class GovernorOrchestrator
 
             var powerResult = RunNeuronWithRetry(_statsNeuron, analyzedBlocks, powerAnchors, 0, usedBlocks);
             finalData.Power = powerResult.Value;
-            
+
             if (powerResult.SourceBlock != null) usedBlocks.Add(powerResult.SourceBlock);
             context.RegisterResult("power", powerResult, "StatsNeuron_Power");
 
@@ -108,7 +108,7 @@ public class GovernorOrchestrator
             var kpNeuron = new StatsNeuron(requireBigNumber: true, excludeValue: finalData.Power);
             var kpResult = RunNeuronWithRetry(kpNeuron, analyzedBlocks, kpAnchors, 0, usedBlocks);
             finalData.KillPoints = kpResult.Value;
-            
+
             if (kpResult.SourceBlock != null) usedBlocks.Add(kpResult.SourceBlock);
             context.RegisterResult("killPoints", kpResult, "StatsNeuron_KP");
 
@@ -118,7 +118,7 @@ public class GovernorOrchestrator
             var allianceResult = RunNeuronWithRetry(_allianceNeuron, analyzedBlocks, anchors, ("--", "--"), usedBlocks);
             finalData.AllianceTag = allianceResult.Value.Item1;
             finalData.AllianceName = allianceResult.Value.Item2;
-            
+
             if (allianceResult.SourceBlock != null) usedBlocks.Add(allianceResult.SourceBlock);
 
             RegisterTupleField(context, "allianceTag", allianceResult.Value.Item1, allianceResult, "AllianceNeuron");
@@ -160,12 +160,31 @@ public class GovernorOrchestrator
             // ---------------------------------------------------------
             // PHASE 3: THE PARALLEL MAGNIFIER
             // ---------------------------------------------------------
-            
+
             Task<List<OcrBlock>>? taskCiv = null;
             Task<List<OcrBlock>>? taskPower = null;
             Task<List<OcrBlock>>? taskName = null;
-            
+            Task<List<OcrBlock>>? taskId = null;
+
             bool scheduledTask = false;
+
+            if (finalData.Id == 0)
+            {
+                // Tenta pegar a âncora que definimos no MapAnchors
+                var idAnchor = anchors.ContainsKey("GovLabel") ? anchors["GovLabel"] : null;
+
+                if (idAnchor != null)
+                {
+                    context.Log("Scheduling Magnifier for: ID");
+                    // Chama o magnifier procurando por "ID"
+                    taskId = _magnifier.HuntForField(imagePath, idAnchor, "ID", context);
+                    scheduledTask = true;
+                }
+                else
+                {
+                    context.LogWarning("WARN_NO_ID_ANCHOR", "Cannot magnify ID: 'Governor/ID' label not found.", "id");
+                }
+            }
 
             // Pass 'context' to Magnifier for attempt logging
             if (finalData.Civilization == "--")
@@ -201,7 +220,7 @@ public class GovernorOrchestrator
                 }
             }
 
-            if (!scheduledTask) 
+            if (!scheduledTask)
             {
                 context.Log("No further magnification possible. Stopping.");
                 keepTrying = false;
@@ -210,14 +229,15 @@ public class GovernorOrchestrator
 
             // Timer for Magnifier wait
             context.StartTimer("MagnifierWait");
-            
+
             var activeTasks = new List<Task<List<OcrBlock>>>();
             if (taskCiv != null) activeTasks.Add(taskCiv);
             if (taskPower != null) activeTasks.Add(taskPower);
             if (taskName != null) activeTasks.Add(taskName);
+            if (taskId != null) activeTasks.Add(taskId);
 
             await Task.WhenAll(activeTasks);
-            
+
             context.StopTimer("MagnifierWait");
 
             // Process results
@@ -243,6 +263,12 @@ public class GovernorOrchestrator
                 analyzedBlocks.AddRange(BlockClassifier.Classify(taskName.Result));
                 foundNewInfo = true;
             }
+            if (taskId != null && taskId.Result.Any())
+            {
+                context.Log($"Magnifier found {taskId.Result.Count} blocks for ID.");
+                analyzedBlocks.AddRange(BlockClassifier.Classify(taskId.Result));
+                foundNewInfo = true;
+            }
 
             if (!foundNewInfo) keepTrying = false;
 
@@ -251,7 +277,7 @@ public class GovernorOrchestrator
 
         context.StopTimer("TotalOrchestration");
         context.Log("Orchestration finished.");
-        
+
         return (finalData, context);
     }
 
@@ -269,14 +295,14 @@ public class GovernorOrchestrator
             Method = method,
             Box = parentResult.SourceBlock != null ? ExtractBox(parentResult.SourceBlock) : null
         };
-        
+
         if (context.Evidence.ContainsKey(key)) context.Evidence[key] = evidence;
         else context.Evidence.Add(key, evidence);
     }
 
     private List<int>? ExtractBox(AnalyzedBlock block)
     {
-         try
+        try
         {
             var rawBox = block.Raw.Box;
             int x = (int)rawBox[0][0];
@@ -324,15 +350,20 @@ public class GovernorOrchestrator
     private Dictionary<string, AnalyzedBlock> MapAnchors(List<AnalyzedBlock> blocks)
     {
         var anchors = new Dictionary<string, AnalyzedBlock>();
+
         void AddAnchor(string key, string[] keywords)
         {
+            // Procura o primeiro bloco que bate com alguma das keywords
             var match = blocks.FirstOrDefault(b => IsKeyword(b.Raw.Text, keywords));
             if (match != null) anchors[key] = match;
         }
 
+        AddAnchor("GovLabel", RokVocabulary.GovernorLabels);
+
         AddAnchor("AllianceLabel", RokVocabulary.AllianceLabels);
         AddAnchor("PowerLabel", RokVocabulary.PowerLabels);
         AddAnchor("KpLabel", RokVocabulary.KillPointsLabels);
+
         var civLabels = new[] { "Civilizacao", "Civilização", "Civilization", "Civilizacion" };
         AddAnchor("CivLabel", civLabels);
 
@@ -358,7 +389,7 @@ public class GovernorOrchestrator
 
         if (data.KillPoints > data.Power && data.Power > 0)
         {
-             context.Log("Note: KP is higher than Power. This is possible for T5 players but rare for new ones.");
+            context.Log("Note: KP is higher than Power. This is possible for T5 players but rare for new ones.");
         }
 
         if (string.IsNullOrWhiteSpace(data.Name)) data.Name = "--";
