@@ -11,7 +11,6 @@ public static class XpVocabulary
         (1000,   "XP_1000",  new[] { "Purple", "Blue" }),
         (5000,   "XP_5000",  new[] { "Purple", "Blue" }),
         (10000,  "XP_10000", new[] { "Gold", "Purple", "Blue" }),
-        // ADICIONADO 'Blue' AQUI:
         (20000,  "XP_20000", new[] { "Gold", "Blue" }),
         (50000,  "XP_50000", new[] { "Gold", "Blue" })
     };

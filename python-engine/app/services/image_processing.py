@@ -200,6 +200,69 @@ class ImageProcessor:
         elif strategy == "Sharpen":
             kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
             return cv2.filter2D(crop, -1, kernel)
+        
+        elif strategy == "ShieldAnalysis":
+            # 1. Convert to HSV
+            hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+            h, w = crop.shape[:2]
+
+            # 2. Define Shield color (Cyan/Light Blue)
+            # Range adjusted to capture bright border and transparent center
+            lower_cyan = np.array([80, 20, 70])   
+            upper_cyan = np.array([130, 255, 255]) 
+            mask = cv2.inRange(hsv, lower_cyan, upper_cyan)
+
+            # 3. Noise Cleaning (Grass, small rivers, decorations)
+            # Opening Operation (Erosion followed by Dilation) removes isolated points
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+            
+            # Closing Operation (Dilation followed by Erosion) connects fragmented bubbles
+            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+            # 4. Find Contours (Shapes)
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            if not contours:
+                return "FALSE"
+
+            # 5. Analyze largest object found (Shield must be the largest blue object in zone)
+            largest_contour = max(contours, key=cv2.contourArea)
+            area = cv2.contourArea(largest_contour)
+            
+            # Minimum Size Filter:
+            # Area must be relevant relative to crop size (Search Zone).
+            # If it is just a small blue dot (e.g., 0.5% of image), it is noise.
+            min_area_threshold = (h * w) * 0.02 # 2% of search area
+            
+            if area < min_area_threshold:
+                return "FALSE"
+
+            # 6. GEOMETRIC VALIDATION (Smart logic)
+            # Shield must be horizontally aligned with the center of the cropped image.
+            # (Recall image is cropped centered on Text in C#)
+            
+            x, y, cw, ch = cv2.boundingRect(largest_contour)
+            shield_center_x = x + (cw / 2)
+            image_center_x = w / 2
+            
+            # Allowed deviation: Shield center cannot be too far from text center.
+            # Allowing 20% deviation.
+            deviation = abs(shield_center_x - image_center_x)
+            max_deviation = w * 0.25 
+
+            if deviation > max_deviation:
+                # Blue object is too far left or right (likely neighbor's shield)
+                return "FALSE"
+
+            # 7. (Optional) Aspect Ratio Validation
+            # Shields are bubbles (almost 1:1 or slightly oval). Rivers are long.
+            aspect_ratio = float(cw) / ch
+            if aspect_ratio > 3.0 or aspect_ratio < 0.3:
+                return "FALSE" # Very thin or tall line, not a bubble
+
+            # If passed all checks: It is a shield!
+            return "TRUE"
 
         # Default: Just Grayscale
         return cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)

@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-03-03
+
+### Added
+- **Kingdom Map Intelligence**: New endpoint `/api/map/analyze` to extract all visible cities from a map screenshot.
+  - **Hybrid Detection Engine**: A multi-layered approach combining three distinct strategies for maximum robustness:
+    1.  **AI Visual Detection (YOLOv8)**: Uses a custom-trained model to find city nameplates and peace shields by their visual shape, immune to language or background clutter.
+    2.  **Anchor-based Fallback (Shields)**: If a peace shield is detected without a corresponding nameplate, the system intelligently calculates the nameplate's expected location and performs a targeted OCR scan.
+    3.  **Heuristic Text Analysis (OCR-first)**: As a final fallback, the system scans all text on the screen and uses a **Dynamic Safe Canvas** to filter out UI/Chat noise, identifying potential cities that the visual AI may have missed.
+  - **Slicing Aided Hyper Inference (SAHI)**: For wide/high-resolution screenshots, the image is automatically split into overlapping slices before AI analysis. This preserves detail and allows the detection of very small, distant cities that would otherwise be lost in resizing.
+  - **Magnifier Refinement Loop**: If a city is detected with low confidence or a missing alliance tag, the `MapMagnifier` is automatically triggered to perform a high-resolution re-scan of the specific area, significantly improving data accuracy.
+
+### Changed
+- **Vocabulary Expansion**: Added new sections to `RokVocabulary` (`TopUiAnchors`, `BottomUiAnchors`, `ChatKeywords`) to support the new Dynamic Canvas logic (coming soon).
+
+### Known Issues
+- **Beta Feature**: Map Analysis is highly effective for screenshots with up to ~1-3 visible cities. In extremely crowded scenarios (e.g., Ark of Osiris starting zones), detection accuracy for smaller, overlapping cities may decrease. Fine-tuning of the "Safe Canvas" and de-duplication logic is ongoing.
+
+---
+
 ## [0.3.1] - 2026-01-31
 
 ### Added

@@ -195,4 +195,63 @@ public class PythonOcrService : IOcrService
             return (new List<OcrBlock>(), string.Empty);
         }
     }
+
+    public async Task<List<YoloDetection>> GetMapDetectionsAsync(Stream imageStream, string fileName)
+    {
+        try
+        {
+            // LOG 1: verify if stream is valid
+            if (imageStream.Length == 0)
+            {
+                _logger.LogError("[PythonOcrService] O stream da imagem está vazio (Length 0).");
+                return new List<YoloDetection>();
+            }
+
+            imageStream.Position = 0;
+
+            using var content = new MultipartFormDataContent();
+            using var streamContent = new StreamContent(imageStream);
+
+            // IMPORTANT: Set the content type to match what FastAPI expects for file uploads
+            streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
+            content.Add(streamContent, "image", fileName); // "image" deve bater com o parâmetro do FastAPI
+
+            _logger.LogInformation("[PythonOcrService] Enviando POST para /map/detect...");
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            var response = await _httpClient.PostAsync("map/detect", content);
+
+            sw.Stop();
+            var rawBody = await response.Content.ReadAsStringAsync();
+            _logger.LogInformation($"[PythonOcrService] Resposta ({sw.ElapsedMilliseconds}ms): Status={response.StatusCode}, Body='{rawBody}'");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError($"[PythonOcrService] Falha na API. Código: {response.StatusCode}.");
+                return new List<YoloDetection>();
+            }
+
+            var options = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+            var result = System.Text.Json.JsonSerializer.Deserialize<YoloDetectionResponse>(rawBody, options);
+
+            if (result == null)
+            {
+                _logger.LogWarning("[PythonOcrService] JSON deserializado resultou em NULL.");
+                return new List<YoloDetection>();
+            }
+
+            _logger.LogInformation($"[PythonOcrService] Sucesso no parse. Success={result.Success}, Detections={result.Detections?.Count ?? 0}");
+
+            return result.Detections ?? new List<YoloDetection>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[PythonOcrService] EXCEÇÃO CRÍTICA ao chamar Python.");
+            return new List<YoloDetection>();
+        }
+    }
 }

@@ -37,6 +37,8 @@
     Full analysis of PvP and PvE reports, including troop metrics, casualty rates, and boss identification.
 *   **🎒 Inventory Intelligence**
     Reads complex inventory screens (Action Points & XP Books). Supports **Multi-Screenshot Merging** and uses **Color Detection** to distinguish items.
+*   **🗺️ Kingdom Map Intelligence (Beta)**
+    Extracts all visible cities from a map screenshot using a **Hybrid AI Engine** (YOLO + OCR), resilient to screen resolution and UI variations.
 *   **✅ Standardized Output (NEW)**
     All endpoints now return a unified `RokResponse` structure with a complete **Audit Log** and detailed **Extraction Evidence** for every field.
 *   **🔍 The Magnifier (Auto-Healing)**
@@ -45,6 +47,7 @@
     Add `Debug: true` to any request to receive granular **Timings** per step, **Raw OCR Text**, and **Magnifier Attempt Logs** in the response.
 *   **🌐 Multicultural Core**
     Optimized for Latin alphabets (EN, PT, ES, FR, DE) with smart detection of unsupported characters.
+
 
 ---
 
@@ -77,94 +80,26 @@ graph LR
 
 ## 🔌 API Usage
 
-### ⚙️ The Standard Response (`RokResponse<T>`)
+RoK Vision exposes a set of RESTful endpoints to analyze different game screens. Every response is wrapped in a standardized `RokResponse<T>` envelope that includes a `summary` with clean data, `fields` with extraction evidence, and an `auditLog`.
 
-Every successful response from the API is wrapped in the `RokResponse<T>` structure, ensuring a consistent contract across all endpoints.
+👉 **[View the Full API Reference](API_REFERENCE.md)** for detailed request/response models and JSON examples.
 
-| Field | Type | Description |
+### Endpoints Overview
+
+| Method | Endpoint | Description |
 |---|---|---|
-| `status.success` | `bool` | `true` if processing finished without critical error. |
-| `status.overallConfidence`| `float` | Aggregated confidence score from 0 to 100. |
-| `data.summary` | `T` (Model) | The final domain object (e.g., `GovernorProfile`, `ReportResult`) clean and ready to use. |
-| `data.fields` | `Dictionary<string, FieldEvidenceDto>`| **Evidence:** Technical details, confidence, method, and bounding box for each extracted field. |
-| `auditLog` | `List<string>` | Chronological history of decisions made by the OCR Orchestrator. |
-| `debug` | `DebugInformationDto` | **OPTIONAL:** Detailed debug information, only present if `Debug: true` is sent in the request. |
-
-### 1. Governor Profile
-`POST /api/governor/analyze`  
-*Requires: `IFormFile Image`, Optional: `int? DraftId`, `bool Debug`*
-
-#### Sample `data.summary` (GovernorProfile)
-```
-{
-  "id": 193397278,
-  "name": "nan0z01",
-  "allianceTag": "RE87",
-  "power": 99999012,
-  "killPoints": 2063935270,
-  "civilization": "Germany"
-}
-```
-
-### 2. Battle Reports
-`POST /api/reports/analyze`  
-*Requires: `IFormFile Image`, Optional: `bool Debug`*
-
-#### Sample `data.summary` (ReportResult)
-```
-{
-  "type": "SingleBattle_PVP",
-  "attacker": { "governorName": "ml Feels", "totalUnits": 40342, "dead": 0, "severelyWounded": 19287 },
-  "defender": { "governorName": "ITRIOSMANGAZi", "dead": 2451, "remaining": 75785 }
-}
-```
-
-### 3. Action Points Inventory
-`POST /api/ap/analyze`  
-*Requires: `List<IFormFile> Images`, Optional: `bool Debug`*
-
-#### Sample `data.summary` (ApInventoryData)
-```
-{
-  "grandTotalAp": 338750,
-  "currentBarValue": 875,
-  "items": [
-    {
-      "name": "Basic Action Point Recovery",
-      "apValue": 100,
-      "quantity": 2086,
-      "confidence": 99.5
-    }
-  ]
-}
-```
-
-### 4. Experience Inventory (Tomes of Knowledge)
-`POST /api/xp/analyze`  
-*Requires: `List<IFormFile> Images`, Optional: `bool Debug`*
-
-#### Sample `data.summary` (XpInventoryData)
-```
-{
-  "totalXp": 182180300,
-  "items": [
-    {
-      "itemId": "XP_50000",
-      "unitValue": 50000,
-      "quantity": 58,
-      "detectedColor": "Gold",
-      "confidence": 98.2
-    }
-  ]
-}
-```
+| `POST` | `/api/governor/analyze` | Extracts all stats from a governor profile screen. |
+| `POST` | `/api/reports/analyze` | Analyzes a PvP or PvE battle report. |
+| `POST` | `/api/ap/analyze` | Reads Action Point items from the inventory. Supports multi-image. |
+| `POST` | `/api/xp/analyze` | Reads Tomes of Knowledge from the inventory. Supports multi-image. |
+| `POST` | `/api/map/analyze` | (Beta) Extracts all visible cities from a kingdom map view. |
 
 ---
 
 ## 📸 Best Practices
 To ensure **>95% accuracy**, follow the "Golden Screenshot" rules:
 1. **Full Screen:** Send original screenshots. Do not crop the image manually.
-2. **No Overlays:** Close the chat, notification bubbles, or side menus before capturing.
+2. **No Overlays:** Close the chat, notification bubbles, or side menus before capturing etc...
 3. **Brightness:** Use standard in-game brightness for optimal contrast.
 
 ---

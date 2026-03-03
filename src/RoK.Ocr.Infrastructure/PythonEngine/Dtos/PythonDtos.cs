@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using RoK.Ocr.Domain.Models;
 
 namespace RoK.Ocr.Infrastructure.PythonEngine.Dtos;
 
@@ -80,4 +81,13 @@ public class BatchItemResult
 
     [JsonPropertyName("strategy")]
     public string Strategy { get; set; } = string.Empty;
+}
+
+public class YoloDetectionResponse
+{
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+
+    [JsonPropertyName("detections")]
+    public List<YoloDetection> Detections { get; set; } = new();
 }

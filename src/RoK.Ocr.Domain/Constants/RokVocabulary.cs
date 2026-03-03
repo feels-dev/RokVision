@@ -156,4 +156,179 @@ public static class RokVocabulary
         "Bizancio", "Byzantium", "Byzance", "Byzanz", "Виzantия",
         "Egito", "Egypt", "Egypte", "Ägypten", "Египет"
     };
+
+    // =================================================================
+    // 4. MAP & WORLD OBJECTS (To filter out non-city labels)
+    // =================================================================
+    public static readonly string[] MapMapObjects =
+    {
+        // Levels
+        "Lvl", "Nivel", "Niveau", "Level", "Ur.", "Stufe", "Ур.", "Lv.", "Lv",
+        
+        // Barbarians & Forts
+        "Barbarian", "Barbaro", "Barbare", "Bárbaro", "Barbar", "Варвар", "野蛮人", "야만인", "คนเถื่อน",
+        "Fort", "Forte", "Festung", "Fortaleza", "Цитадель", "Pháo đài", "Benteng", "ป้อม",
+        
+        // Resources (Wood, Food, Stone, Gold, Gems)
+        "Madeira", "Wood", "Bois", "Holz", "Madera", "Дерево", "木材", "목재", "Kayu", "ไม้",
+        "Comida", "Food", "Nourriture", "Nahrung", "Comida", "Еда", "食物", "식량", "Makanan", "อาหาร",
+        "Pedra", "Stone", "Pierre", "Stein", "Piedra", "Камень", "石料", "석재", "Batu", "หิน",
+        "Ouro", "Gold", "Or", "Gold", "Oro", "Золото", "金币", "금화", "Emas", "ทอง",
+        "Gemas", "Gems", "Gemmes", "Edelsteine", "Gemas", "Самоцветы", "宝石", "보석", "Permata", "อัญมณี",
+        
+        // Map UI / Markers
+        "Alliance", "Alianca", "Territory", "Territorio", "Territoire", "Territorium", "Территория", "领土", "영토",
+        "Marker", "Marcador", "Marqueur", "Markierung", "Маркер"
+    };
+
+    // =================================================================
+    // 5. MAP UI BLOCKLIST (To strictly filter out HUD elements)
+    // =================================================================
+    public static readonly string[] MapUiBlocklist =
+{
+        // ═══════════════════════════════════════════════════════════
+        // BOTTOM NAVIGATION MENU
+        // ═══════════════════════════════════════════════════════════
+        "Campanha", "Campaign", "Kampagne", "Campagne", "Campaña",
+        "Itens", "Items", "Gegenstände", "Objets", "Artículos", "tens",
+        "Alianca", "Aliança", "Alliance", "Allianz", "Alianza",
+        "Comandante", "Commander", "Kommandant", "Commandant", "Comandantes",
+        "Mensagem", "Message", "Nachricht", "Mensaje", "Chat",
+
+        // ═══════════════════════════════════════════════════════════
+        // SIDE QUEST PANEL (Left Side)
+        // ═══════════════════════════════════════════════════════════
+        "Irmaos de Armas", "Irmãos de Armas", "Brothers in Arms",
+        "Crie uma alianca", "Crie uma aliança", "Create an alliance",
+        "participe de uma", "participate in",
+        "Eu Protejo Voce", "Eu Protejo Você", "I Protect You",
+        "Ajude seus aliados", "Help your allies",
+        "vezes", "times",
+        "Terra da Civilizacao", "Terra da Civilização", "Civilization Land",
+        "A Cupula", "A Cúpula", "The Dome",
+        "O Retorno do Rei", "The King's Return",
+        "Aprimore a Prefeitura", "Upgrade City Hall",
+        "Derrote", "Defeat", "tropas barbaras", "barbarian troops",
+        
+        // ═══════════════════════════════════════════════════════════
+        // MAP INTERACTION MENU
+        // ═══════════════════════════════════════════════════════════
+        "Entrar", "Enter", "Betreten", "Entrer",
+        "Explorar", "Explore", "Erkunden", "Explorer",
+        "Atacar", "Attack", "Angreifen", "Attaquer",
+        "Reunir", "Rally", "Sammeln", "Rallier",
+        "Comando rapido", "Comando rápido", "Quick Command",
+        "Protejo", "Protect", "Schützen", "Protéger",
+
+        // ═══════════════════════════════════════════════════════════
+        // HUD ELEMENTS (Top)
+        // ═══════════════════════════════════════════════════════════
+        "VIP", "UTC", "X:", "Y:", "KM", "M",
+        "Localizacao", "Localização", "Location",
+        
+        // ═══════════════════════════════════════════════════════════
+        // COMMON FALSE POSITIVES (Generic UI)
+        // ═══════════════════════════════════════════════════════════
+        "Missao", "Missão", "Mission", "Quest",
+        "Reino", "Kingdom", "Royaume",
+        "Beneficio", "Benefício", "Buff", "Benefit",
+        "Nivel", "Nível", "Level", "Lvl",
+        
+        // ═══════════════════════════════════════════════════════════
+        // NUMBERS AND RATIOS (Quest Progress)
+        // ═══════════════════════════════════════════════════════════
+        "(0/5)", "(5/5)", "(1/3)", "0/5", "5/5",
+        
+        // ═══════════════════════════════════════════════════════════
+        // RESOURCES & UI ICONS
+        // ═══════════════════════════════════════════════════════════
+        "Comida", "Food", "Madeira", "Wood", "Pedra", "Stone",
+        "Ouro", "Gold", "Gemas", "Gems",
+        
+        // ═══════════════════════════════════════════════════════════
+        // MAP OBJECTS (Not Player Cities)
+        // ═══════════════════════════════════════════════════════════
+        "Barbarian", "Barbaro", "Bárbaro", "Barbare",
+        "Fort", "Forte", "Festung", "Fortaleza",
+        "Territory", "Territorio", "Território", "Territorium",
+        
+        // ═══════════════════════════════════════════════════════════
+        // ADDITIONAL LANGUAGES (Asian/Arabic)
+        // ═══════════════════════════════════════════════════════════
+        "战役", "道具", "联盟", "指挥官", "消息", // Chinese
+        "캠페인", "아이템", "연맹", "사령관", "메시지", // Korean
+        "الحملة", "العناصر", "التحالف", "القائد", "الرسالة", // Arabic
+
+            // Portuguese
+    "Comando", "rapido", "Campanha", "Itens", "Alianca", "Comandante", "Mensagem",
+    "Irmaos de Armas", "Crie uma alianca", "participe de uma", "Eu Protejo Voce",
+    "Ajude seus aliados", "Terra da Civilizacao", "Derrote", "tropas barbaras",
+    "A Cupula", "Aprimore a Prefeitura", "Nivel", "Retorno do Rei",
+    "Bom te ver de novo", "Rise of Kingdoms", "governador",
+    
+    // English
+    "Command", "Quick", "Campaign", "Items", "Alliance", "Commander", "Message",
+    "Brothers in Arms", "Create an alliance", "join one", "I Protect You",
+    "Help your allies", "Land of Civilization", "Defeat", "barbarian troops",
+    "The Dome", "Upgrade City Hall", "Level", "Return of the King",
+    "Good to see you again", "governor",
+    
+    // Spanish
+    "Comando", "rapido", "Campaña", "Articulos", "Alianza", "Comandante", "Mensaje",
+    
+    // Common UI
+    "VIP", "UTC", "KM",
+
+            // --- Bottom Menu & Panels ---
+        "Comando", "Command", "Campanha", "Campaign", "Itens", "Items",
+        "Alianca", "Alliance", "Mensagem", "Message", "Comandante", "Commander",
+        "Rapido", "Quick", "Chat", "System", "Sistema",
+        "Campagne", "Allianz", "Nachricht", "Objets", // DE/FR
+
+        // --- Top HUD ---
+        "VIP", "UTC", "KM", "Power", "Poder", "Might",
+
+        // --- Side Quests / Events ---
+        "Irmaos", "Brothers", "Protejo", "Protect", "Civiliza", "Civilization",
+        "Derrote", "Defeat", "Barbaras", "Barbarian", "Cupula", "Dome",
+        "Prefeitura", "City Hall", "Retorno", "Return", "Rei", "King",
+        "Give_up", "Destroy", "Mark", "Guardians", "Castles", "Start", "Help",
+        "Gracia", "Cry", "Thanks", "Obrigado", "Merci", "Danke", "Gg",
+        
+        // --- Asian / Arabic UI ---
+        "战役", "道具", "联盟", "指挥官", "消息", // CN
+        "캠페인", "아이템", "연맹", "사령관", "메시지", // KR
+        "الحملة", "العناصر", "التحالف", "القائد", "الرسالة" // AR
+
+    };
+
+    public static readonly string[] MapNoiseKeywords =
+    {
+        "/", ":", "...", "…",
+        "M", "K", // Resource suffixes if combined with numbers
+        "Lvl", "Lv.", "Nivel"
+    };
+
+    // Keywords strictly found at the TOP (HUD)
+    public static readonly string[] TopUiAnchors =
+    {
+        "VIP", "UTC", "KM", "Power", "Poder", "Might", "Governador", "Governor"
+    };
+
+    // Keywords strictly found at the BOTTOM (Menu)
+    public static readonly string[] BottomUiAnchors =
+    {
+        "Comando", "Command", "Campanha", "Campaign", "Itens", "Items",
+        "Alianca", "Alliance", "Mensagem", "Message", "Comandante", "Commander",
+        "Campagne", "Allianz", "Nachricht", "Objets"
+    };
+
+    // Keywords for Chat/Action Logs (Dynamic Exclusion Areas)
+    public static readonly string[] ChatKeywords =
+    {
+        "Rapido", "Quick", "Chat", "System", "Sistema",
+        "Give_up", "Destroy", "Mark", "Guardians", "Castles", "Start", "Help",
+        "Gracia", "Cry", "Thanks", "Obrigado", "Merci", "Danke", "Gg",
+        ":", "..."
+    };
 }

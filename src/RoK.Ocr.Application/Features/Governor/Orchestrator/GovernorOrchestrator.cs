@@ -170,13 +170,11 @@ public class GovernorOrchestrator
 
             if (finalData.Id == 0)
             {
-                // Tenta pegar a âncora que definimos no MapAnchors
                 var idAnchor = anchors.ContainsKey("GovLabel") ? anchors["GovLabel"] : null;
 
                 if (idAnchor != null)
                 {
                     context.Log("Scheduling Magnifier for: ID");
-                    // Chama o magnifier procurando por "ID"
                     taskId = _magnifier.HuntForField(imagePath, idAnchor, "ID", context);
                     scheduledTask = true;
                 }
@@ -353,7 +351,6 @@ public class GovernorOrchestrator
 
         void AddAnchor(string key, string[] keywords)
         {
-            // Procura o primeiro bloco que bate com alguma das keywords
             var match = blocks.FirstOrDefault(b => IsKeyword(b.Raw.Text, keywords));
             if (match != null) anchors[key] = match;
         }

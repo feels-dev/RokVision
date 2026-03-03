@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using RoK.Ocr.Application.Common.Dtos;
 using RoK.Ocr.Domain.Models;
 
@@ -48,7 +49,8 @@ public class OcrAnalysisContext
     
     public void RegisterAnchors(IEnumerable<string> keys)
     {
-        DebugInfo.AnchorsFound.AddRange(keys);
+        if (keys != null)
+            DebugInfo.AnchorsFound.AddRange(keys);
     }
 
     public void RegisterMagnifierAttempt(string field, int tries, string? winner, bool success)
@@ -77,7 +79,7 @@ public class OcrAnalysisContext
     {
         var evidence = new FieldEvidenceDto
         {
-            Value = result.Value,
+            Value = result.Value?.ToString() ?? string.Empty,
             Confidence = Math.Clamp(Math.Round(result.Confidence, 2), 0, 100), 
             Method = strategyName,
             Raw = result.SourceBlock?.Raw.Text ?? string.Empty,
@@ -109,5 +111,13 @@ public class OcrAnalysisContext
             return new List<int> { x, y, w, h };
         }
         catch { return null; }
+    }
+
+    public double GetTotalProcessingTime()
+    {
+        if (DebugInfo.Timings.TryGetValue("TotalOrchestration", out double val))
+            return val / 1000.0; // Converte ms para segundos
+            
+        return (DateTime.UtcNow - StartTime).TotalSeconds;
     }
 }

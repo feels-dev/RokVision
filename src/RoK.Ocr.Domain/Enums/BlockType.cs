@@ -19,5 +19,6 @@ public enum BlockType
     WatchtowerLabel,
     KillPointsLabel,
     StatusResult,
-    CommanderName
+    CommanderName,
+    Coordinate
 }

@@ -10,3 +10,5 @@ opencv-python-headless==4.9.0.80
 protobuf==3.20.2
 shapely==2.0.3
 filelock==3.13.1
+onnxruntime==1.18.0
+aiofiles==23.2.1

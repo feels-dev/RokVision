@@ -4,6 +4,8 @@ using RoK.Ocr.Application.Features.Experience.Orchestrator;
 using RoK.Ocr.Application.Features.Experience.Services;
 using RoK.Ocr.Application.Features.Governor.Orchestrator;
 using RoK.Ocr.Application.Features.Governor.Services;
+using RoK.Ocr.Application.Features.Map.Orchestrator;
+using RoK.Ocr.Application.Features.Map.Services;
 using RoK.Ocr.Application.Features.Reports.Orchestrator;
 using RoK.Ocr.Application.Features.Reports.Services; // Includes ReportScoreCalculator
 using RoK.Ocr.Domain.Interfaces;
@@ -53,6 +55,11 @@ builder.Services.AddScoped<ApOrchestrator>();
 
 builder.Services.AddScoped<XpOrchestrator>();
 builder.Services.AddScoped<XpMagnifier>();
+
+// Feature: Map
+builder.Services.AddScoped<MapOrchestrator>();
+builder.Services.AddScoped<MapMagnifier>();
+
 var app = builder.Build();
 
 // --- 2. HTTP PIPELINE ---

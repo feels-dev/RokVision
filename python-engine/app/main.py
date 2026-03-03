@@ -1,45 +1,83 @@
 # Path: app/main.py
+
 import logging
+import uvicorn
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from app.core.engine import OcrEngine
-from app.api.routes import governor, reports, batch, inventory
 
-# Logging Setup
+# Internal Modules
+from app.core.engine import OcrEngine
+from app.api.routes import governor, reports, batch, inventory, map
+
+# 1. Logging Setup
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("RoKVision")
 
-# Lifespan Events (New way FastAPI manages Startup/Shutdown)
+# 2. Lifespan Events (Startup/Shutdown Logic)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Forces model loading into memory
-    logger.info("♻️ Warming up OCR Engine...")
-    OcrEngine.get_instance()
+    """
+    Gerencia o ciclo de vida da aplicação.
+    Executa warmup do modelo OCR ao iniciar para evitar lentidão na primeira requisição.
+    """
+    logger.info("♻️  Starting RoK Vision Engine...")
+    logger.info("🔥 Warming up OCR Model (PaddleOCR)...")
+    
+    try:
+        # Força o carregamento do modelo na memória
+        engine = OcrEngine.get_instance()
+        # Teste rápido opcional para garantir que carregou
+        logger.info(f"✅ OCR Engine Ready: {type(engine)}")
+    except Exception as e:
+        logger.critical(f"❌ Failed to load OCR Engine: {e}")
+        raise e
+    
     yield
-    # Shutdown logic if needed
-    logger.info("🛑 Shutting down...")
+    
+    logger.info("🛑 Shutting down RoK Vision Engine...")
 
+# 3. FastAPI App Definition
 app = FastAPI(
     title="RoK Vision API",
-    description="OCR Engine with Specialized Neurons for Rise of Kingdoms",
+    description="High-Performance OCR Engine for Rise of Kingdoms (Python Backend)",
     version="1.0.0",
     lifespan=lifespan
 )
 
-# Routes
+# 4. Router Registration
+# Registra todos os módulos funcionais do sistema
 app.include_router(governor.router, prefix="/governor", tags=["Governor Profile"])
 app.include_router(reports.router, prefix="/reports", tags=["Battle Reports"])
 app.include_router(batch.router, prefix="/batch", tags=["Batch Processing"])
 app.include_router(inventory.router, prefix="/inventory", tags=["Inventory UI"])
+app.include_router(map.router, prefix="/map", tags=["Map Detection"])
 
-@app.get("/health")
+# 5. Global/Health Endpoints
+@app.get("/", tags=["System"])
+async def root():
+    return {
+        "system": "RoK Vision API",
+        "status": "Running",
+        "docs": "/docs"
+    }
+
+@app.get("/health", tags=["System"])
 async def health_check():
-    return {"status": "online", "engine": "PaddleOCR v4 optimized"}
+    """
+    Endpoint leve para verificação de status (k8s/docker).
+    """
+    return {"status": "online", "engine": "PaddleOCR v4"}
 
+# 6. Entry Point (para execução direta via python main.py)
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        "app.main:app", 
+        host="0.0.0.0", 
+        port=8000, 
+        reload=True,
+        log_level="info"
+    )
