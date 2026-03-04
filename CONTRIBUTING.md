@@ -2,7 +2,7 @@
 
 First of all, thank you for your interest in the project! 🛡️
 
-### Current Project Status: Initial Development (v0.3.x)
+### Current Project Status: Initial Development
 The project is currently in a high-intensity development phase. I am working on the core architecture and fundamental features listed in the [ROADMAP.md].
 
 **Important:** At this stage, I am **not accepting Pull Requests (PRs)** for new features or major refactors. This is to avoid code conflicts while the base structure is still evolving rapidly.
@@ -14,6 +14,6 @@ Even though code contributions are closed for a while, you can still help a lot:
 3. **Feedback:** Tell me how the API is performing on your specific hardware.
 
 ### When will PRs be open?
-Once we reach a more stable version (v0.5.0+), I will update this file with guidelines for code contributions.
+Once we reach a more stable version, I will update this file with guidelines for code contributions.
 
 Thank you for understanding!
