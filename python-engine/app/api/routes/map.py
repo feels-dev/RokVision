@@ -10,8 +10,8 @@ storage = LocalImageStorage()
 
 # Load model
 MODEL_PATH = os.getenv("MODEL_PATH", "app/models/rok_map_detector_v1.onnx")
-# ADJUSTMENT 1: Lower confidence_thresh to 0.25 (RoK is visually cluttered)
-detector = YoloDetector(model_path=MODEL_PATH, confidence_thresh=0.25)
+# ADJUSTMENT 1: Lower confidence_thresh to 0.10 (RoK is visually cluttered)
+detector = YoloDetector(model_path=MODEL_PATH, confidence_thresh=0.10)
 
 @router.post("/detect", summary="Detects objects on the RoK map")
 async def detect_map_objects(image: UploadFile = File(...)):

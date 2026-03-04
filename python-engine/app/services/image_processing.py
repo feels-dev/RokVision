@@ -263,6 +263,25 @@ class ImageProcessor:
 
             # If passed all checks: It is a shield!
             return "TRUE"
+        # --- STRATEGY: MAP LABEL ---
+        elif strategy == "MapLabel":
+            # 1. Convert to grayscale
+            gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+            
+            # 2. Invert colors (OCR loves black text on white background)
+            # The white text becomes black (0), and the dark background becomes light (200+)
+            inverted = cv2.bitwise_not(gray)
+            
+            # 3. Enhance Contrast (Adaptive)
+            # CLAHE is perfect for removing gradient shadows from the grass/map
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+            contrast_enhanced = clahe.apply(inverted)
+            
+            # 4. Sharpen to make edges crisp
+            kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+            final = cv2.filter2D(contrast_enhanced, -1, kernel)
+            
+            return final
 
         # Default: Just Grayscale
         return cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)

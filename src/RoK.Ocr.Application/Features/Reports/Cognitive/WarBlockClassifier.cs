@@ -12,7 +12,7 @@ namespace RoK.Ocr.Application.Features.Reports.Cognitive;
 // Classe partial para suportar GeneratedRegex
 public static partial class WarBlockClassifier
 {
-    // --- REGEX OTIMIZADOS ---
+
     [GeneratedRegex(@"^\[.+|\[.*\]", RegexOptions.Compiled)]
     private static partial Regex AllianceTagRegex();
 
@@ -25,7 +25,7 @@ public static partial class WarBlockClassifier
     [GeneratedRegex(@"X:?\s*\d+.*Y:?\s*\d+", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex CoordinateRegex();
 
-    // Regex para limpar string numérica
+
     [GeneratedRegex(@"[^0-9]", RegexOptions.Compiled)]
     private static partial Regex NonDigitRegex();
 

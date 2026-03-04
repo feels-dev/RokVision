@@ -28,9 +28,9 @@ class OcrEngine:
                 show_log=False,
                 ocr_version='PP-OCRv4',
                 # Detection optimizations
-                det_db_thresh=0.3,
-                det_db_box_thresh=0.6,
-                det_db_unclip_ratio=1.5
+                det_db_thresh=0.2,
+                det_db_box_thresh=0.3,
+                det_db_unclip_ratio=1.6
             )
             
             # WARMUP: Pass a tiny black image just to load weights into memory

@@ -331,4 +331,17 @@ public static class RokVocabulary
         "Gracia", "Cry", "Thanks", "Obrigado", "Merci", "Danke", "Gg",
         ":", "..."
     };
+
+    public static readonly string[] DefaultGovernorPrefixes =
+    {
+        // European
+        "Governor", "Governador", "Gouverneur", "Gobernador",
+        "Statthalter", "Vali", 
+        
+        // Cyrillic
+        "Правитель", 
+        
+        // Asian / Arabic (In case OCR reads them combined with numbers)
+        "执政官", "집정관", "領主", "الحاكم"
+    };
 }

@@ -11,25 +11,32 @@ namespace RoK.Ocr.Application.Features.Map.Neurons;
 /// </summary>
 public class CityNeuron
 {
-    public (string Name, string AllianceTag) Parse(string rawText, bool hasShield)
+    /// <summary>
+    /// Parses the raw text into a City Name and Alliance Tag.
+    /// Returns a RejectReason if the text is deemed invalid.
+    /// </summary>
+    public (string Name, string AllianceTag, string RejectReason) Parse(string rawText, bool hasShield)
     {
         if (string.IsNullOrWhiteSpace(rawText) || rawText.Length < 2)
-            return ("--INVALID--", "");
+            return ("--INVALID--", "", "EMPTY_OR_TOO_SHORT");
 
-        // ETAPA 1: SANITIZAÇÃO PRÉ-PROCESSAMENTO
-        // Lida com erros comuns de OCR antes de analisar.
-        // Ex: "1Ab461DDF" -> "[Ab46]DDF",  "[Ab461DDF" -> "[Ab46]DDF"
+        // STEP 1: PRE-PROCESSING SANITIZATION
         string text = SanitizeInput(rawText);
 
-        // ETAPA 2: FILTROS DE RUÍDO
-        // Rejeita timers, números soltos, e texto com baixa densidade de letras.
-        if (IsEventTimerOrNoise(text)) return ("--INVALID--", "");
-        if (text.All(char.IsDigit)) return ("--INVALID--", "");
+        // STEP 2: NOISE FILTERS
+        if (IsEventTimerOrNoise(text))
+            return ("--INVALID--", "", "MATCHED_TIMER_PATTERN");
 
+        if (text.All(char.IsDigit))
+            return ("--INVALID--", "", "ONLY_DIGITS");
+
+        // Calculate letter density to avoid reading random map textures as text
         int validChars = text.Count(c => char.IsLetterOrDigit(c) || c == ' ' || c == '[' || c == ']');
-        if ((double)validChars / text.Length < 0.7) return ("--INVALID--", "");
+        double letterRatio = (double)validChars / (double)text.Length;
+        if (letterRatio < 0.6)
+            return ("--INVALID--", "", $"LOW_LETTER_RATIO_{Math.Round(letterRatio, 2)}");
 
-        // ETAPA 3: LÓGICA DE EXTRAÇÃO DE TAG (Mantida)
+        // STEP 3: TAG EXTRACTION LOGIC
         string tag = "";
         string name = "";
 
@@ -81,54 +88,50 @@ public class CityNeuron
             name = text;
         }
 
-        // ETAPA 4: LIMPEZA FINAL
+        // STEP 4: FINAL CLEANUP
         tag = CleanTag(tag);
         name = CleanName(name);
 
-        if (IsUiNoise(name) || name.Length < 2)
-            return ("--INVALID--", "");
+        // STEP 5: SMART BLOCKLIST VALIDATION
+        // If the name is a system-generated default name (e.g., "Governor12345"), 
+        // we bypass the vocabulary blocklist completely.
+        if (!IsDefaultGovernorName(name))
+        {
+            string? matchedBlocklistWord = GetUiNoiseMatch(name);
+            if (!string.IsNullOrEmpty(matchedBlocklistWord))
+                return ("--INVALID--", "", $"BLOCKED_BY_VOCABULARY_MATCH: '{matchedBlocklistWord}'");
+        }
 
-        return (name, tag);
+        if (name.Length < 2)
+            return ("--INVALID--", "", "NAME_TOO_SHORT_AFTER_CLEANUP");
+
+        return (name, tag, "SUCCESS");
     }
 
     private string CleanTag(string tag)
     {
         if (string.IsNullOrWhiteSpace(tag)) return "";
         tag = tag.Trim();
-
         if (tag.Length > 5) return "";
-
         return tag;
     }
 
     private string SanitizeInput(string text)
     {
         text = text.Trim();
-
-        // 1. Corrige erros de colchetes: 1 -> [, ] -> I, etc.
-        // Ex: "[Ab461DDF" -> "[Ab46]DDF"
-        // Regex procura por 4-5 chars alfanuméricos após '[' e um número/letra maiúscula
+        // Fix common bracket OCR errors: 1 -> [, ] -> I, etc.
         text = Regex.Replace(text, @"(\[[A-Za-z0-9]{4,5})([1Il])", "$1]");
-
-        // 2. Remove caracteres especiais que não fazem parte de nomes.
-        // Mantém letras (incluindo acentos e alfabetos estrangeiros), números, e colchetes.
+        // Remove special characters that are not part of names
         text = Regex.Replace(text, @"[^a-zA-Z0-9\p{L}\[\]\s]", "");
-
         return text.Trim();
     }
 
     private bool IsEventTimerOrNoise(string text)
     {
-        // Padrão para timers de evento: (d) (h):(m):(s)
-        // Ex: "9d 09:40:55", "29d21:36:16"
-        // Regex procura por "d", "h", "m" ou "s" junto com múltiplos ":" e números.
-        if (Regex.IsMatch(text, @"(\d+d)?\s*\d{1,2}:\d{2}:\d{2}"))
-            return true;
-
-        // Filtro para ratios como "1/3" que podem ser lidos por engano
-        if (text.Contains('/') && text.Length < 6 && text.Any(char.IsDigit))
-            return true;
-
+        // Pattern for event timers: (d) (h):(m):(s)
+        if (Regex.IsMatch(text, @"(\d+d)?\s*\d{1,2}:\d{2}:\d{2}")) return true;
+        // Filter for ratios like "1/3"
+        if (text.Contains('/') && text.Length < 6 && text.Any(char.IsDigit)) return true;
         return false;
     }
 
@@ -136,21 +139,50 @@ public class CityNeuron
     {
         if (string.IsNullOrWhiteSpace(name)) return "";
         name = name.Trim();
-
+        // Remove trailing numbers separated by space (e.g., city levels like " 13")
         name = Regex.Replace(name, @"\s+\d{1,2}$", "").Trim();
-
         return name;
     }
 
-    private bool IsUiNoise(string text)
+    /// <summary>
+    /// Checks if the name matches the Rise of Kingdoms default player name pattern.
+    /// Dynamically builds the Regex based on RokVocabulary to support multi-language.
+    /// E.g., "Governor12345", "Governador 8976".
+    /// </summary>
+    private bool IsDefaultGovernorName(string name)
     {
-        // Consome diretamente do Vocabulary centralizado
+        // Dynamically join prefixes with OR operator (|)
+        // Escaping is generally not needed for simple letters, but good practice if prefixes had special chars.
+        string prefixes = string.Join("|", RokVocabulary.DefaultGovernorPrefixes);
+
+        // Regex Construction:
+        // ^(...)     - Starts with one of the vocabulary prefixes
+        // \s*        - Optional space
+        // \d{4,}     - Followed by at least 4 digits
+        // $          - End of string
+        string pattern = $@"^({prefixes})\s*\d{{4,}}$";
+
+        return Regex.IsMatch(name, pattern, RegexOptions.IgnoreCase);
+    }
+
+    private string? GetUiNoiseMatch(string text)
+    {
         foreach (var keyword in RokVocabulary.MapUiBlocklist)
         {
-            if (text.Contains(keyword, StringComparison.OrdinalIgnoreCase))
-                return true;
-        }
+            // Exact match = Instant Block
+            if (text.Equals(keyword, StringComparison.OrdinalIgnoreCase))
+                return keyword;
 
-        return false;
+            // Partial match logic:
+            // We only block if the forbidden word represents the vast majority of the text (> 80%).
+            // This prevents false positives when a player's actual name contains a blocked substring.
+            if (text.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+            {
+                double matchRatio = (double)keyword.Length / text.Length;
+                if (matchRatio > 0.8)
+                    return keyword;
+            }
+        }
+        return null;
     }
 }

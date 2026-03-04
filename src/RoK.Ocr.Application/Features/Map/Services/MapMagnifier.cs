@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using RoK.Ocr.Application.Common.Cognitive;
 using RoK.Ocr.Application.Common.Models;
 using RoK.Ocr.Domain.Constants;
 using RoK.Ocr.Domain.Interfaces;
@@ -24,8 +25,12 @@ public class MapMagnifier
         _storage = storage;
     }
 
+    /// <summary>
+    /// Divides the image into slices to improve YOLO detection of small objects (Shields/Cities).
+    /// </summary>
     public async Task<List<YoloDetection>> PerformSlicedDetectionAsync(string imagePath, int width, int height, string originalFileName)
     {
+        // If the image is small enough, slicing is not necessary
         if (width <= 1200)
         {
             using var stream = new FileStream(imagePath, FileMode.Open, FileAccess.Read);
@@ -34,12 +39,12 @@ public class MapMagnifier
 
         var allDetections = new ConcurrentBag<YoloDetection>();
         var tasks = new List<Task>();
-        int sliceWidth = (int)(width * 0.60);
+        int sliceWidth = (int)(width * 0.60); // 60% of width with overlap in the middle
 
-        // Slice 1: Left
+        // Slice 1: Left side
         tasks.Add(ProcessSliceAsync(imagePath, new Rectangle(0, 0, sliceWidth, height), 0, originalFileName, allDetections));
 
-        // Slice 2: Right
+        // Slice 2: Right side
         int startX = width - sliceWidth;
         tasks.Add(ProcessSliceAsync(imagePath, new Rectangle(startX, 0, sliceWidth, height), startX, originalFileName, allDetections));
 
@@ -48,6 +53,10 @@ public class MapMagnifier
         return MergeDetections(allDetections.ToList());
     }
 
+    /// <summary>
+    /// Finds city candidates based purely on text (Fallback when YOLO fails).
+    /// Uses DynamicHudLocator to ignore UI text blocks.
+    /// </summary>
     public List<OcrRegionCandidate> FindTextBasedCandidates(
         List<AnalyzedBlock> blocks,
         int imgWidth,
@@ -56,23 +65,22 @@ public class MapMagnifier
     {
         var candidates = new List<OcrRegionCandidate>();
 
-        // Safe Canvas Definitions
-        int safeTopY = (int)(imgHeight * 0.14);
-        int safeBottomY = (int)(imgHeight * 0.85);
-
-        var chatZone = new Rectangle(0, (int)(imgHeight * 0.65), (int)(imgWidth * 0.20), (int)(imgHeight * 0.30));
-
-        var rightIconZone = new Rectangle((int)(imgWidth * 0.88), safeTopY, (int)(imgWidth * 0.12), (int)(imgHeight * 0.60));
+        // 1. DYNAMIC MASK CONSTRUCTION
+        // Analyzes where the UI buttons are and creates forbidden zones (red zones)
+        var hudMask = DynamicHudLocator.BuildDynamicMask(blocks, imgWidth, imgHeight);
 
         foreach (var block in blocks)
         {
             string text = block.Raw.Text.Trim();
 
+            // Basic text quality filters
             if (text.Length < 3) continue;
             if (IsNoiseOrRatio(text)) continue;
+
+            // Explicit Blocklist (forbidden words from vocabulary)
             if (RokVocabulary.MapUiBlocklist.Any(bad => text.Contains(bad, StringComparison.OrdinalIgnoreCase))) continue;
 
-            // Spatial Filter
+            // Geometry calculations
             var r = block.Raw.Box;
             int bx = (int)r[0][0];
             int by = (int)r[0][1];
@@ -81,19 +89,25 @@ public class MapMagnifier
             int cx = bx + (bw / 2);
             int cy = by + (bh / 2);
 
-            if (by < safeTopY) continue;
-            if (by > safeBottomY) continue;
-            if (rightIconZone.Contains(cx, cy)) continue;
-
-            // LÓGICA ESPECIAL: Se parecer muito uma cidade (tem colchetes), ignoramos a ChatZone
+            // SPECIAL LOGIC: Cities with TAG [XXX] are very obvious and reliable.
+            // If it has brackets, we give it a higher "vote of confidence".
             bool looksLikeCityStrong = text.Contains("[") && text.Contains("]");
-            if (!looksLikeCityStrong && chatZone.Contains(cx, cy)) continue;
 
+            // 2. DYNAMIC HUD APPLICATION
+            // If it's NOT a strong candidate (no tag) AND it is inside a UI zone, we ignore it.
+            if (!looksLikeCityStrong && !hudMask.IsSafe(cx, cy))
+            {
+                continue; // Text is overlapping chat, resources, or menu. Garbage.
+            }
+
+            // Check if this area is already covered by a YOLO detection (prevent duplicates)
             var simpleBox = new int[] { bx, by, bw, bh };
             if (IsAreaCovered(simpleBox, coveredAreas)) continue;
 
+            // If it passed all filters, it is a valid city candidate!
             candidates.Add(new OcrRegionCandidate
             {
+                Id = Guid.NewGuid().ToString(),
                 Box = new int[] {
                     Math.Max(0, bx - 15),
                     Math.Max(0, by - 5),
@@ -104,14 +118,16 @@ public class MapMagnifier
                 CenterY = cy,
                 HasShield = false,
                 Source = "Text_Fallback",
-                Strategy = "Sharpen"
+                Strategy = "MapLabel"
             });
         }
 
         return candidates;
     }
 
-    // --- Private Helpers ---
+    // =================================================================================
+    // PRIVATE HELPERS
+    // =================================================================================
 
     private bool IsNoiseOrRatio(string text)
     {
@@ -121,7 +137,7 @@ public class MapMagnifier
         // 2. Check Noise Patterns (/, :) from Vocabulary
         if (RokVocabulary.MapNoiseKeywords.Any(noise => text.Contains(noise))) return true;
 
-        // 3. Numeric check (Resource counters 13.5M)
+        // 3. Numeric check (Resource counters like 13.5M)
         if (text.Any(char.IsDigit) && (text.Contains('M') || text.Contains('K')))
         {
             // Allow names like "Player123" but block "12.5M"
@@ -145,11 +161,18 @@ public class MapMagnifier
             using (var sliceStream = new FileStream(slicePath, FileMode.Open, FileAccess.Read))
             {
                 var detections = await _ocrService.GetMapDetectionsAsync(sliceStream, fileName);
-                foreach (var d in detections) { d.Box[0] += xOffset; results.Add(d); }
+                foreach (var d in detections)
+                {
+                    d.Box[0] += xOffset;
+                    results.Add(d);
+                }
             }
         }
         catch { }
-        finally { if (File.Exists(slicePath)) File.Delete(slicePath); }
+        finally
+        {
+            if (File.Exists(slicePath)) File.Delete(slicePath);
+        }
     }
 
     private List<YoloDetection> MergeDetections(List<YoloDetection> raw)
@@ -159,12 +182,15 @@ public class MapMagnifier
         {
             double cx = det.Box[0] + det.Box[2] / 2.0;
             double cy = det.Box[1] + det.Box[3] / 2.0;
+
+            // Remove nearby duplicates caused by slicing overlap
             bool isDup = final.Any(ex =>
             {
                 double exCx = ex.Box[0] + ex.Box[2] / 2.0;
                 double exCy = ex.Box[1] + ex.Box[3] / 2.0;
                 return ex.ClassName == det.ClassName && Math.Sqrt(Math.Pow(cx - exCx, 2) + Math.Pow(cy - exCy, 2)) < 30;
             });
+
             if (!isDup) final.Add(det);
         }
         return final;
@@ -174,6 +200,7 @@ public class MapMagnifier
     {
         int cx = box[0] + (box[2] / 2);
         int cy = box[1] + (box[3] / 2);
+        // Uses a rough 50x50 pixel grid to check for overlapping areas
         return covered.Contains($"{cx / 50}_{cy / 50}");
     }
 
@@ -212,9 +239,7 @@ public class MapMagnifier
                     ctx.Resize(w * 3, h * 3, KnownResamplers.Bicubic);
 
                     // 3. Enhance (Sharpen + Contrast)
-                    // High contrast helps separate white text from green/ground background
                     ctx.Contrast(1.3f);
-                    // Gaussian Sharpen
                     ctx.GaussianSharpen(1.0f);
                 });
 
@@ -223,12 +248,12 @@ public class MapMagnifier
                 await image.SaveAsync(cropPath);
             }
 
-            // 4. Re-analyze
+            // 4. Re-analyze with Global OCR
             var (blocks, _) = await _ocrService.AnalyzeImageAsync(cropPath);
 
             if (blocks != null && blocks.Any())
             {
-                // Join blocks horizontally
+                // Join blocks horizontally to reconstruct the string
                 var sortedBlocks = blocks.OrderBy(b => b.Box[0][0]).ToList();
                 string combinedText = string.Join(" ", sortedBlocks.Select(b => b.Text.Trim()));
 

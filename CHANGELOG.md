@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-03-04
+
+### Added
+- **Dynamic HUD Masking**: Introduced `DynamicHudLocator`, a smart cognitive component that analyzes the screenshot to identify UI elements (Chat, Resources, Menus) and creates a "forbidden zone" mask. This allows the Text Fallback engine to safely ignore text inside the interface while detecting cities in the open field with high precision.
+- **Whitelist Override Logic**: Updated `CityNeuron` with a "Smart Blocklist" feature. It now correctly identifies and allows default player names (e.g., "Governor123456") even if the word "Governor" is in the global blocklist, solving a critical false-negative issue.
+- **X-Ray Debugging**: Enhanced the visual debug system via API response.
+  - **Audit Log Transparency**: The API response now includes a granular, step-by-step log of why each candidate was accepted or rejected (e.g., `BLOCKED_BY_VOCABULARY`, `LOW_LETTER_RATIO`).
+  - **Raw Text Separation**: The debug output now cleanly separates the global OCR text from the targeted crop reads, making it easier to diagnose recognition issues without file system access.
+
+### Changed
+- **Map Strategy Refinement**: Switched the primary extraction strategy from `WhiteIsolation` to `MapLabel`. This new strategy uses adaptive contrast enhancement and color inversion (Black Text on White Background), which proved to be significantly more effective for reading thin city names against complex map textures.
+- **Anchor Detection**: The `anchorsFound` list in the debug response is now correctly populated with UI elements found in the image, aiding in layout verification.
+
+---
+
 ## [0.4.0] - 2026-03-03
 
 ### Added

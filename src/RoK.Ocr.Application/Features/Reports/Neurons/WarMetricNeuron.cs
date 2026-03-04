@@ -11,11 +11,9 @@ using RoK.Ocr.Domain.Models.Reports;
 
 namespace RoK.Ocr.Application.Features.Reports.Neurons;
 
-// ATENÇÃO: A classe agora é 'partial' para permitir o Source Generator
 public partial class WarMetricNeuron
 {
-    // Otimização .NET 9: Regex compilado em tempo de build
-    // Captura números com decimais opcionais e sufixos K/M
+
     [GeneratedRegex(@"(\d+[\.,]?\d*)\s*([KM]?)", RegexOptions.Compiled)]
     private static partial Regex NumberParserRegex();
 
@@ -68,7 +66,6 @@ public partial class WarMetricNeuron
 
         clean = clean.Replace("|", " ").Replace("I", "1").Replace("L", "1").Replace("O", "0").Replace("+", "").Trim();
         
-        // USO OTIMIZADO: Chama o método gerado
         var match = NumberParserRegex().Match(clean);
 
         if (!match.Success) return 0;
