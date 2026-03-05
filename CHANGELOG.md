@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-03-05
+
+### Added
+- **Alliance Rally Intelligence**: New endpoint `/api/rally/analyze` capable of reading complex War screens (both "War Details" and "Active Rallies" lists).
+  - **Context-Aware Slicing**: The system automatically detects if the screenshot is a single rally detail or a list of active rallies and adjusts the scanning strategy accordingly.
+  - **Participant Card Extraction**: Identifies and extracts individual rally participants, including their Name, Primary/Secondary Commanders, and marched troop count.
+  - **Logical Inference Engine**: A specialized "Brain" component that deduces missing troop types by cross-referencing individual march counts with the rally's global unit totals (e.g., if the rally is 100% Infantry, all participants are inferred as Infantry).
+  - **Geometric Auto-Repair**: Uses the `RallyTroopMagnifier` to mathematically reconstruct missing data (like troop counts) based on relative anchor positions (e.g., Commander Level labels).
+  - **Multi-Image Stitching**: Supports scrolling screenshots to capture long lists of participants without duplicating data.
+
+### Known Issues
+- **Troop Tier Detection (Beta)**: The current heuristic for detecting Troop Tiers (T4 vs T5) based on icon color (`RallyTroopMagnifier`) is sensitive to the game's UI background colors. This may result in false positives (e.g., identifying T5 Gold borders when the background is dark blue).
+  - **Workaround**: The `Logical Inference Engine` mitigates this by enforcing consistency with global rally totals where possible.
+  - **Upcoming Fix**: We are actively refactoring the vision engine to replace pixel-math heuristics with **YOLOv8 Micro-Models** in v0.6.0 for 100% accurate visual recognition.
+
+---
+
 ## [0.4.1] - 2026-03-04
 
 ### Added

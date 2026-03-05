@@ -1,5 +1,3 @@
-# Path: app/main.py
-
 import logging
 import uvicorn
 from fastapi import FastAPI
@@ -21,16 +19,16 @@ logger = logging.getLogger("RoKVision")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Gerencia o ciclo de vida da aplicação.
-    Executa warmup do modelo OCR ao iniciar para evitar lentidão na primeira requisição.
+    Manages the application lifecycle.
+    Triggers an OCR model warmup on startup to eliminate cold-start latency for the first request.
     """
     logger.info("♻️  Starting RoK Vision Engine...")
     logger.info("🔥 Warming up OCR Model (PaddleOCR)...")
     
     try:
-        # Força o carregamento do modelo na memória
+        # Forces the OCR model to load into memory
         engine = OcrEngine.get_instance()
-        # Teste rápido opcional para garantir que carregou
+        # Verifies successful engine initialization
         logger.info(f"✅ OCR Engine Ready: {type(engine)}")
     except Exception as e:
         logger.critical(f"❌ Failed to load OCR Engine: {e}")
@@ -49,7 +47,7 @@ app = FastAPI(
 )
 
 # 4. Router Registration
-# Registra todos os módulos funcionais do sistema
+# Registers all functional sub-modules
 app.include_router(governor.router, prefix="/governor", tags=["Governor Profile"])
 app.include_router(reports.router, prefix="/reports", tags=["Battle Reports"])
 app.include_router(batch.router, prefix="/batch", tags=["Batch Processing"])
@@ -68,11 +66,11 @@ async def root():
 @app.get("/health", tags=["System"])
 async def health_check():
     """
-    Endpoint leve para verificação de status (k8s/docker).
+    Lightweight endpoint for liveness/readiness probes (k8s/docker).
     """
     return {"status": "online", "engine": "PaddleOCR v4"}
 
-# 6. Entry Point (para execução direta via python main.py)
+# 6. Entry Point (for direct execution via python main.py)
 if __name__ == "__main__":
     uvicorn.run(
         "app.main:app", 

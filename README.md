@@ -39,11 +39,13 @@
     Reads complex inventory screens (Action Points & XP Books). Supports **Multi-Screenshot Merging** and uses **Color Detection** to distinguish items.
 *   **🗺️ Kingdom Map Intelligence (Beta)**
     Extracts all visible cities from a map screenshot using a **Hybrid AI Engine** (YOLO + OCR), resilient to screen resolution and UI variations.
-*   **✅ Standardized Output (NEW)**
+*   **🛡️ Alliance Rally Intelligence**
+    Analyzes war screens to extract Rally Leader, Target (Forts/Passes), and a detailed list of participants. Includes a **Logical Inference Engine** to deduce troop types based on global rally statistics.
+*   **✅ Standardized Output**
     All endpoints now return a unified `RokResponse` structure with a complete **Audit Log** and detailed **Extraction Evidence** for every field.
 *   **🔍 The Magnifier (Auto-Healing)**
     Automatic regional re-scanning with specialized digital filters (White Isolation, Inverted Binary) for low-confidence areas.
-*   **🩺 Debug Mode (NEW)**
+*   **🩺 Debug Mode**
     Add `Debug: true` to any request to receive granular **Timings** per step, **Raw OCR Text**, and **Magnifier Attempt Logs** in the response.
 *   **🌐 Multicultural Core**
     Optimized for Latin alphabets (EN, PT, ES, FR, DE) with smart detection of unsupported characters.
@@ -61,7 +63,7 @@ The easiest way to run RoK Vision is using Docker. It sets up the Neural Network
 
 ## 🏗️ Architecture
 
-The solution follows a distributed architecture: the **Muscle** (Python) handles the heavy AI computer vision, while the **Brain** (C#) manages the logical orchestration.
+The solution follows a distributed architecture: the **Eye** (Python) handles the heavy AI computer vision, while the **Brain** (C#) manages the logical orchestration.
 
 ```mermaid
 graph LR
@@ -71,7 +73,7 @@ graph LR
         Orchestrator --> Neurons[Specialized Neurons]
         Neurons --> Magnifier[The Magnifier]
     end
-    subgraph "The Muscle (Python)"
+    subgraph "The Eye (Python)"
         Orchestrator -->|"gRPC/HTTP"| OCR[PaddleOCR Engine]
     end
 ```
@@ -93,6 +95,7 @@ RoK Vision exposes a set of RESTful endpoints to analyze different game screens.
 | `POST` | `/api/ap/analyze` | Reads Action Point items from the inventory. Supports multi-image. |
 | `POST` | `/api/xp/analyze` | Reads Tomes of Knowledge from the inventory. Supports multi-image. |
 | `POST` | `/api/map/analyze` | (Beta) Extracts all visible cities from a kingdom map view. |
+| `POST` | `/api/rally/analyze` | Extracts details from Alliance Rally screens (Header, Target, Participants). |
 
 ---
 

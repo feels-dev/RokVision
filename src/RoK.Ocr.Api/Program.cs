@@ -6,6 +6,8 @@ using RoK.Ocr.Application.Features.Governor.Orchestrator;
 using RoK.Ocr.Application.Features.Governor.Services;
 using RoK.Ocr.Application.Features.Map.Orchestrator;
 using RoK.Ocr.Application.Features.Map.Services;
+using RoK.Ocr.Application.Features.Rally.Orchestrator;
+using RoK.Ocr.Application.Features.Rally.Services;
 using RoK.Ocr.Application.Features.Reports.Orchestrator;
 using RoK.Ocr.Application.Features.Reports.Services; // Includes ReportScoreCalculator
 using RoK.Ocr.Domain.Interfaces;
@@ -59,6 +61,10 @@ builder.Services.AddScoped<XpMagnifier>();
 // Feature: Map
 builder.Services.AddScoped<MapOrchestrator>();
 builder.Services.AddScoped<MapMagnifier>();
+
+// Feature: Rally
+builder.Services.AddScoped<RallyOrchestrator>();
+builder.Services.AddScoped<RallyTroopMagnifier>();
 
 var app = builder.Build();
 

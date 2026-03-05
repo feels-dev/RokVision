@@ -1,5 +1,5 @@
 services:
-  # --- Python Service (OCR Engine - The Muscle) ---
+  # --- Python Service (OCR Engine - The Eye) ---
   ocr-engine:
     build:
       context: ./python-engine

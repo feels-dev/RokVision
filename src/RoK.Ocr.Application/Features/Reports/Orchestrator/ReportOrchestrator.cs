@@ -6,8 +6,8 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using RoK.Ocr.Application.Common.Cognitive;
-using RoK.Ocr.Application.Common.Dtos;    
-using RoK.Ocr.Application.Common.Models;  
+using RoK.Ocr.Application.Common.Dtos;
+using RoK.Ocr.Application.Common.Models;
 using RoK.Ocr.Application.Features.Reports.Cognitive;
 using RoK.Ocr.Application.Features.Reports.Neurons;
 using RoK.Ocr.Application.Features.Reports.Services;
@@ -49,7 +49,7 @@ public class ReportOrchestrator
         // 1. Initialize Context and Timers
         var context = new OcrAnalysisContext();
         context.StartTimer("TotalOrchestration");
-        
+
         context.Log($"Starting Report Analysis for: {Path.GetFileName(imagePath)}");
         var result = new ReportResult();
 
@@ -57,17 +57,17 @@ public class ReportOrchestrator
         context.StartTimer("PythonInitialScan");
         var (blocks, width, height, isIsolated, processedImgName) = await _ocrService.AnalyzeReportAsync(imagePath);
         context.StopTimer("PythonInitialScan");
-        
+
         context.Log($"OCR Scan Complete. Found {blocks.Count} blocks. Isolated: {isIsolated}");
 
         // Populate basic debug info if requested
         if (debugMode)
         {
-            context.DebugInfo.Image = new ImageMetaDto 
-            { 
-                Path = imagePath, 
+            context.DebugInfo.Image = new ImageMetaDto
+            {
+                Path = imagePath,
                 // Report returns the processed canvas size, use as reference
-                Width = (int)width, 
+                Width = (int)width,
                 Height = (int)height,
                 ResizeScale = 1.0 // Python returns normalized coords
             };
@@ -86,7 +86,7 @@ public class ReportOrchestrator
 
         WarBlockClassifier.ClassifyNodes(nodes);
         var graph = new TopologyGraph(nodes, width, height);
-        
+
         // Register anchors for debug
         if (debugMode)
         {
@@ -99,7 +99,7 @@ public class ReportOrchestrator
 
         result.Type = DetectReportType(nodes);
         context.StopTimer("GraphBuild");
-        
+
         context.Log($"Detected Report Type: {result.Type}");
 
         // 4. Intelligence and Repair Cycle
@@ -128,7 +128,7 @@ public class ReportOrchestrator
             if (!result.IsMathematicallySound() && retryCount < maxRetries)
             {
                 context.LogWarning("WARN_MATH_MISMATCH", "Troops calculation mismatch. Initiating Batch Repair.");
-                
+
                 // Attempt repair via Magnifier
                 await AttemptRepairAsync(targetImageForMagnifier, nodes, context);
 
@@ -143,7 +143,7 @@ public class ReportOrchestrator
             {
                 processingNeeded = false;
             }
-            
+
             context.StopTimer($"Cycle_{retryCount}");
         }
 
@@ -286,16 +286,16 @@ public class ReportOrchestrator
     private async Task AttemptRepairAsync(string imagePath, List<AnalyzedBlock> nodes, OcrAnalysisContext context)
     {
         context.StartTimer("MagnifierBatchRepair");
-        
+
         var lowConfNodes = nodes.Where(n => n.Type == BlockType.Number && n.Raw.Confidence < 0.85).ToList();
-        if (!lowConfNodes.Any()) 
+        if (!lowConfNodes.Any())
         {
             context.StopTimer("MagnifierBatchRepair");
             return;
         }
 
         context.Log($"Batch Repair: Sending {lowConfNodes.Count} nodes to Python Magnifier.");
-        
+
         // Call Magnifier (passing context for detailed logs)
         var results = await _magnifier.RescanBatchAsync(imagePath, lowConfNodes, context);
 
@@ -316,10 +316,10 @@ public class ReportOrchestrator
                 recovered++;
             }
         }
-        
+
         // Register Magnifier stats in DebugInfo
         context.RegisterMagnifierAttempt("BatchMathRepair", lowConfNodes.Count, $"Recovered: {recovered}", recovered > 0);
-        
+
         context.StopTimer("MagnifierBatchRepair");
     }
 
@@ -359,8 +359,21 @@ public class ReportOrchestrator
 
     private List<CommanderEntry> TryIdentifyNpcCommaders(TopologyGraph graph, List<AnalyzedBlock> nodes)
     {
+        // 1. Get the list as NpcEntry (Correct semantic type)
         var npcsVocab = _vocabLoader.GetNpcs();
-        var npcCommNeuron = new CommanderNeuron(npcsVocab);
+
+        // 2. Map to CommanderEntry to satisfy the legacy CommanderNeuron contract
+        // This fixes CS1503 without breaking the Reports logic
+        var convertedVocab = npcsVocab.Select(npc => new CommanderEntry
+        {
+            Id = npc.Id,
+            CanonicalName = npc.CanonicalName,
+            Rarity = npc.Rarity,
+            Expertise = npc.Expertise,
+            Labels = npc.Labels
+        }).ToList();
+
+        var npcCommNeuron = new CommanderNeuron(convertedVocab);
         return npcCommNeuron.Extract(graph, SideLocation.Defender, nodes);
     }
 }

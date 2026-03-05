@@ -23,7 +23,7 @@ cd RoKVision
 ```
 
 ### 2. Build and Run (The Easy Way)
-RoK Vision uses `docker-compose` to orchestrate the Brain (.NET) and the Muscle (Python).
+RoK Vision uses `docker-compose` to orchestrate the Brain (.NET) and the Eye (Python).
 
 Run the following command to build the images and start the containers:
 
