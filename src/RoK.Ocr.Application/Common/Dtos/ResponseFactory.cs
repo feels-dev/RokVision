@@ -1,57 +1,82 @@
 using System;
 using System.Collections.Generic;
+using RoK.Ocr.Application.Common.Models;
 
 namespace RoK.Ocr.Application.Common.Dtos;
 
+/// <summary>
+/// Factory responsible for building standard API responses, mapping telemetry and business data.
+/// </summary>
 public static class ResponseFactory
 {
     public static RokResponse<T> CreateSuccess<T>(
-        T summary, 
-        Dictionary<string, FieldEvidenceDto> fields, 
-        List<string> auditLog, 
-        double processingTime,
-        double overallConfidence = 100,
-        List<SystemWarning>? warnings = null)
+        T businessSummary,
+        OcrAnalysisContext context,
+        string correlationId,
+        ImageContextDto imageContext)
     {
         return new RokResponse<T>
         {
-            Meta = new MetaDto(), // Automatically generates timestamp and ID
+            Meta = new MetaDto
+            {
+                CorrelationId = correlationId,
+                ImageContext = imageContext
+            },
             Status = new StatusDto
             {
                 Success = true,
-                Code = 200,
-                Message = "Analysis completed successfully.",
-                ProcessingTimeSeconds = processingTime,
-                OverallConfidence = overallConfidence,
-                Warnings = warnings ?? new List<SystemWarning>()
+                HttpCode = 200,
+                ExecutionTimeMs = context.GetTotalProcessingTimeMs(),
+                OverallConfidence = CalculateOverallConfidence(context.ExtractedFields),
+                Warnings = context.Warnings
             },
             Data = new DataEnvelope<T>
             {
-                Summary = summary,
-                Fields = fields
+                BusinessSummary = businessSummary,
+                ExtractedFields = context.ExtractedFields,
+                Interactables = context.Interactables
             },
-            AuditLog = auditLog
+            ExecutionTrace = context.ExecutionTrace
+            // Note: 'Debug' property mapping is typically handled at the Controller level 
+            // depending on the incoming request flags (?debug=true).
         };
     }
 
-    public static RokResponse<T> CreateFailure<T>(string message, string errorCode = "ERR_INTERNAL", int httpCode = 500)
+    public static RokResponse<T> CreateFailure<T>(string message, string errorCode = "ERR_INTERNAL", int httpCode = 500, string correlationId = "")
     {
+        var trace = new ExecutionTraceDto();
+        trace.Steps.Add(new ExecutionStepDto 
+        { 
+            Level = "ERROR", 
+            Component = "System_Gateway", 
+            Message = message 
+        });
+
         return new RokResponse<T>
         {
-            Meta = new MetaDto(),
+            Meta = new MetaDto { CorrelationId = string.IsNullOrEmpty(correlationId) ? Guid.NewGuid().ToString() : correlationId },
             Status = new StatusDto
             {
                 Success = false,
-                Code = httpCode,
-                Message = message,
-                ProcessingTimeSeconds = 0,
+                HttpCode = httpCode,
+                ExecutionTimeMs = 0,
                 Warnings = new List<SystemWarning> 
                 { 
-                    new SystemWarning(errorCode, message) 
+                    new SystemWarning(errorCode, message, "CRITICAL") 
                 }
             },
             Data = null,
-            AuditLog = new List<string> { $"[CRITICAL] {message}" }
+            ExecutionTrace = trace
         };
+    }
+
+    private static double CalculateOverallConfidence(Dictionary<string, FieldEvidenceDto> fields)
+    {
+        if (fields == null || fields.Count == 0) return 0;
+        
+        double sum = 0;
+        foreach (var f in fields.Values) sum += f.Confidence;
+        
+        return Math.Round(sum / fields.Count, 2);
     }
 }

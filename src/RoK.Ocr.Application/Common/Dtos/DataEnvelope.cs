@@ -4,21 +4,25 @@ using System.Text.Json.Serialization;
 namespace RoK.Ocr.Application.Common.Dtos;
 
 /// <summary>
-/// Generic envelope separating the simple domain model from technical extraction details.
+/// Generic envelope separating the clean domain model from technical extraction details and UI elements.
 /// </summary>
 /// <typeparam name="T">The domain model type (e.g., GovernorProfile, ReportResult)</typeparam>
 public class DataEnvelope<T>
 {
     /// <summary>
-    /// The clean domain object ready for use.
-    /// </summary>
-    [JsonPropertyName("summary")]
-    public T Summary { get; set; } = default!;
+    /// The clean domain object ready for business use.
+    /// </summary>[JsonPropertyName("businessSummary")]
+    public T BusinessSummary { get; set; } = default!;
 
     /// <summary>
-    /// Technical details, confidence, and evidence for each extracted field.
+    /// Technical details, confidence, and spatial evidence for each extracted text field.
     /// The dictionary key is the field name (e.g., "power", "id").
-    /// </summary>
-    [JsonPropertyName("fields")]
-    public Dictionary<string, FieldEvidenceDto> Fields { get; set; } = new();
+    /// </summary>[JsonPropertyName("extractedFields")]
+    public Dictionary<string, FieldEvidenceDto> ExtractedFields { get; set; } = new();
+
+    /// <summary>
+    /// A collection of UI elements (buttons, icons) detected in the image, 
+    /// providing exact coordinates for automation tools to interact with.
+    /// </summary>[JsonPropertyName("interactables")]
+    public Dictionary<string, InteractableElementDto> Interactables { get; set; } = new();
 }
