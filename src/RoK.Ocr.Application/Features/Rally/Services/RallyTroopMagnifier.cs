@@ -186,7 +186,8 @@ public class RallyTroopMagnifier
 
         if (!batchRequests.Any()) return new List<OcrBlock>();
 
-        context.Log($"[Magnifier] Dispatching {batchRequests.Count} geometric repair boxes.");
+        // ENENTERPRISE UPDATE: Added component name to log
+        context.Log("RallyTroopMagnifier", $"Dispatching {batchRequests.Count} geometric repair boxes.");
         var results = await _ocrService.AnalyzeBatchAsync(imagePath, batchRequests);
 
         var globalBlocks = new List<OcrBlock>();

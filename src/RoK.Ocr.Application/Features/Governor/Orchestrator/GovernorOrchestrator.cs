@@ -30,11 +30,11 @@ public class GovernorOrchestrator
     }
 
     public async Task<(GovernorProfile Profile, OcrAnalysisContext Context)> AnalyzeAsync(
-    string imagePath,
-    List<OcrBlock> rawBlocks,
-    int imageWidth,
-    int imageHeight,
-    int draftId = 0)
+        string imagePath,
+        List<OcrBlock> rawBlocks,
+        int imageWidth,
+        int imageHeight,
+        int draftId = 0)
     {
         // 1. Initialize Audit Context and Total Timer
         var context = new OcrAnalysisContext
@@ -85,7 +85,7 @@ public class GovernorOrchestrator
                     usedBlocks.Add(idResult.SourceBlock);
                     anchors["ID"] = idResult.SourceBlock;
                 }
-                context.RegisterResult("id", idResult, "IdNeuron");
+                context.RegisterResult("id", idResult, idResult.Strategy);
             }
             else
             {
@@ -103,7 +103,7 @@ public class GovernorOrchestrator
             finalData.Power = powerResult.Value;
 
             if (powerResult.SourceBlock != null) usedBlocks.Add(powerResult.SourceBlock);
-            context.RegisterResult("power", powerResult, "StatsNeuron_Power");
+            context.RegisterResult("power", powerResult, powerResult.Strategy);
 
             // ---------------------------------------------------------
             // 3. KILL POINTS
@@ -116,7 +116,7 @@ public class GovernorOrchestrator
             finalData.KillPoints = kpResult.Value;
 
             if (kpResult.SourceBlock != null) usedBlocks.Add(kpResult.SourceBlock);
-            context.RegisterResult("killPoints", kpResult, "StatsNeuron_KP");
+            context.RegisterResult("killPoints", kpResult, kpResult.Strategy);
 
             // ---------------------------------------------------------
             // 4. ALLIANCE (Tuple handling)
@@ -127,22 +127,22 @@ public class GovernorOrchestrator
 
             if (allianceResult.SourceBlock != null) usedBlocks.Add(allianceResult.SourceBlock);
 
-            RegisterTupleField(context, "allianceTag", allianceResult.Value.Item1, allianceResult, "AllianceNeuron");
-            RegisterTupleField(context, "allianceName", allianceResult.Value.Item2, allianceResult, "AllianceNeuron");
+            RegisterTupleField(context, "allianceTag", allianceResult.Value.Item1, allianceResult, allianceResult.Strategy);
+            RegisterTupleField(context, "allianceName", allianceResult.Value.Item2, allianceResult, allianceResult.Strategy);
 
             // ---------------------------------------------------------
             // 5. CIVILIZATION
             // ---------------------------------------------------------
             var civResult = RunNeuronWithRetry(_civNeuron, analyzedBlocks, anchors, "--", usedBlocks);
             finalData.Civilization = civResult.Value;
-            context.RegisterResult("civilization", civResult, "CivNeuron");
+            context.RegisterResult("civilization", civResult, civResult.Strategy);
 
             // ---------------------------------------------------------
             // 6. NAME
             // ---------------------------------------------------------
             var nameResult = RunNeuronWithRetry(_nameNeuron, analyzedBlocks, anchors, "--", usedBlocks);
             finalData.Name = nameResult.Value;
-            context.RegisterResult("name", nameResult, "NameNeuron");
+            context.RegisterResult("name", nameResult, nameResult.Strategy);
 
             // ---------------------------------------------------------
             // PHASE 2: AUDIT AND DECISION
@@ -268,7 +268,6 @@ public class GovernorOrchestrator
                 analyzedBlocks.AddRange(BlockClassifier.Classify(taskName.Result));
                 foundNewInfo = true;
             }
-
             if (taskId != null && taskId.Result.Any())
             {
                 context.Log("Orchestrator", $"Magnifier found {taskId.Result.Count} blocks for ID.");
@@ -286,6 +285,7 @@ public class GovernorOrchestrator
 
         return (finalData, context);
     }
+
     // =================================================================================
     // HELPER METHODS
     // =================================================================================
@@ -301,20 +301,6 @@ public class GovernorOrchestrator
         };
 
         context.RegisterResult(key, dummyResult, method);
-    }
-
-    private List<int>? ExtractBox(AnalyzedBlock block)
-    {
-        try
-        {
-            var rawBox = block.Raw.Box;
-            int x = (int)rawBox[0][0];
-            int y = (int)rawBox[0][1];
-            int w = (int)(rawBox[1][0] - rawBox[0][0]);
-            int h = (int)(rawBox[2][1] - rawBox[1][1]);
-            return new List<int> { x, y, w, h };
-        }
-        catch { return null; }
     }
 
     private ExtractionResult<T> RunNeuronWithRetry<T>(
@@ -347,7 +333,7 @@ public class GovernorOrchestrator
 
         return bestResult != null && bestResult.Confidence > 0
             ? bestResult
-            : new ExtractionResult<T> { Value = defaultValue, Confidence = 0 };
+            : new ExtractionResult<T> { Value = defaultValue, Confidence = 0, Strategy = "Failed" };
     }
 
     private Dictionary<string, AnalyzedBlock> MapAnchors(List<AnalyzedBlock> blocks)
@@ -361,7 +347,6 @@ public class GovernorOrchestrator
         }
 
         AddAnchor("GovLabel", RokVocabulary.GovernorLabels);
-
         AddAnchor("AllianceLabel", RokVocabulary.AllianceLabels);
         AddAnchor("PowerLabel", RokVocabulary.PowerLabels);
         AddAnchor("KpLabel", RokVocabulary.KillPointsLabels);
@@ -384,7 +369,7 @@ public class GovernorOrchestrator
         if (data.Power > 1_500_000_000)
         {
             context.LogWarning("ConsistencyAuditor", "WARN_IMPLAUSIBLE_POWER", $"Power ({data.Power}) seemed too high. Swapped with KP.", "MEDIUM", "power");
-
+            
             var temp = data.Power;
             data.Power = data.KillPoints;
             data.KillPoints = temp;

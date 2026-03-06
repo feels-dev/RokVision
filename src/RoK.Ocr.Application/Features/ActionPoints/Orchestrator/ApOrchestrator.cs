@@ -46,7 +46,7 @@ public class ApOrchestrator
         var context = new OcrAnalysisContext(); 
         context.StartTimer("TotalOrchestration"); 
 
-        context.Log($"Starting AP inventory analysis for {images.Count} images.");
+        context.Log("ApOrchestrator", $"Starting AP inventory analysis for {images.Count} images.");
 
         int imageIndex = 0;
 
@@ -71,9 +71,19 @@ public class ApOrchestrator
                 var (rawBlocks, fullText) = await _ocrService.AnalyzeInventoryAsync(tempPath);
                 context.StopTimer($"Image_{imageIndex}_Python");
 
-                context.Log($"[IMG {imageIndex}] OCR Scan Complete. Found {rawBlocks?.Count ?? 0} blocks.");
+                // Capture Dimensions from first image
+                if (imageIndex == 1)
+                {
+                    using (var imgInfo = await SixLabors.ImageSharp.Image.LoadAsync(tempPath))
+                    {
+                        context.ImageWidth = imgInfo.Width;
+                        context.ImageHeight = imgInfo.Height;
+                        context.DebugInfo.ImagePath = tempPath;
+                    }
+                }
 
-                // Migrate Raw Text to Debug (if requested)
+                context.Log("ApOrchestrator", $"[IMG {imageIndex}] OCR Scan Complete. Found {rawBlocks?.Count ?? 0} blocks.");
+
                 if (debugMode && fullText.Length > 0)
                 {
                     context.DebugInfo.RawText += $"--- IMG {imageIndex} ---\n{fullText}\n";
@@ -86,33 +96,25 @@ public class ApOrchestrator
                 var nodes = BlockClassifier.Classify(rawBlocks);
 
                 // --- MAGNIFIER INTEGRATION START ---
-                // Identify potential numbers with low confidence before extraction
                 var riskyBlocks = nodes
                     .Where(n => n.Type == BlockType.Number && n.Raw.Confidence < 0.85)
                     .ToList();
 
                 if (riskyBlocks.Any())
                 {
-                    context.Log($"[Magnifier] Identified {riskyBlocks.Count} low confidence blocks. Attempting repair...");
+                    context.Log("ApMagnifier", $"Identified {riskyBlocks.Count} low confidence blocks. Attempting repair...");
                     
-                    // Call Magnifier
                     var improvedBlocks = await _magnifier.RescanQuantitiesAsync(tempPath, riskyBlocks, context);
 
                     int repairedCount = 0;
-                    // Apply repairs to the nodes list
                     foreach (var improved in improvedBlocks)
                     {
-                        // Find the corresponding node (simple matching by text or intersection could be better, 
-                        // but here we rely on the list reference if we had the ID, 
-                        // logic here assumes improvedBlocks maps back to riskyBlocks content)
-                        
-                        // Heuristic match based on box overlap since ID might change
                         var originalNode = riskyBlocks.FirstOrDefault(rb => 
                             CalculateOverlap(rb.Raw.Box, improved.Box) > 0.8);
 
                         if (originalNode != null && improved.Confidence > originalNode.Raw.Confidence)
                         {
-                            context.Log($"[Magnifier] Repaired: '{originalNode.Raw.Text}' -> '{improved.Text}'");
+                            context.Log("ApMagnifier", $"Repaired: '{originalNode.Raw.Text}' -> '{improved.Text}'");
                             originalNode.Raw.Text = improved.Text;
                             originalNode.Raw.Confidence = improved.Confidence;
                             repairedCount++;
@@ -133,20 +135,19 @@ public class ApOrchestrator
                     {
                         finalData.CurrentBarValue = barResult.Current;
                         finalData.MaxBarValue = barResult.Max;
-                        context.Log($"AP Bar initialized to {barResult.Current}/{barResult.Max}.");
+                        context.Log("ApBarNeuron", $"AP Bar initialized to {barResult.Current}/{barResult.Max}.");
                     }
                     else if (finalData.MaxBarValue != barResult.Max || finalData.CurrentBarValue != barResult.Current)
                     {
-                        context.LogWarning("WARN_AP_BAR_DIVERGENCE",
+                        context.LogWarning("ConsistencyAuditor", "WARN_AP_BAR_DIVERGENCE",
                                              $"Divergence detected in image {imageIndex}. Prev: {finalData.CurrentBarValue}/{finalData.MaxBarValue}, New: {barResult.Current}/{barResult.Max}. Kept previous value.",
-                                             "ap_bar");
+                                             "LOW", "ap_bar");
                     }
                 }
 
                 // 5. Item Extraction
-                // Now extracts using potentially corrected numbers
                 var itemsFound = _itemNeuron.Extract(graph, nodes);
-                context.Log($"[IMG {imageIndex}] Extracted {itemsFound.Count} potential items.");
+                context.Log("ApOrchestrator", $"[IMG {imageIndex}] Extracted {itemsFound.Count} potential items.");
 
                 // 6. Merge & Conflict
                 foreach (var newItem in itemsFound)
@@ -161,9 +162,9 @@ public class ApOrchestrator
                             if (Math.Abs(newItem.Confidence - existingItem.Confidence) <= 5.0) useNew = newItem.Quantity > existingItem.Quantity;
 
                             string winnerName = useNew ? "New Item" : "Existing Item";
-                            context.LogWarning("WARN_ITEM_CONFLICT",
+                            context.LogWarning("ConsistencyAuditor", "WARN_ITEM_CONFLICT",
                                 $"Item '{newItem.Name}' conflict. Values: {existingItem.Quantity} vs {newItem.Quantity}. Chosen: {winnerName} (Conf: {newItem.Confidence}% vs {existingItem.Confidence}%).",
-                                fieldKey);
+                                "MEDIUM", fieldKey);
 
                             if (useNew)
                             {
@@ -183,19 +184,22 @@ public class ApOrchestrator
                     else
                     {
                         itemTracker.Add(newItem.ItemId, newItem);
-                        context.RegisterResult(fieldKey, CreateExtractionResult(newItem), "ApItemNeuron_New");
+                        context.RegisterResult(fieldKey, CreateExtractionResult(newItem), newItem.Strategy ?? "ApItem_Direct");
                     }
                 }
                 context.StopTimer($"Image_{imageIndex}_Logic");
             }
             catch (Exception ex)
             {
-                context.LogError($"[System Error] Failed to process image {imageFile.FileName}: {ex.Message}");
+                context.LogError("ApOrchestrator", $"[System Error] Failed to process image {imageFile.FileName}: {ex.Message}");
                 _logger.LogError(ex, "Error processing image {FileName}", imageFile.FileName);
             }
             finally
             {
-                if (!string.IsNullOrEmpty(tempPath)) _storage.DeleteImage(tempPath);
+                if (!string.IsNullOrEmpty(tempPath) && File.Exists(tempPath)) 
+                {
+                    try { File.Delete(tempPath); } catch { }
+                }
                 context.StopTimer($"Image_{imageIndex}_Total");
             }
         }
@@ -203,12 +207,10 @@ public class ApOrchestrator
         finalData.Items = itemTracker.Values.OrderBy(i => i.UnitValue).ToList();
 
         context.StopTimer("TotalOrchestration");
-        context.AuditLog.Add($"[INFO] Final AP Inventory Confidence: {finalData.Items.Average(i => i.Confidence):F2}%");
-
+        
         return (finalData, context);
     }
 
-    // Helper for box overlap calculation
     private double CalculateOverlap(List<List<double>> box1, List<List<double>> box2)
     {
         // Simple AABB overlap check logic for matching
@@ -227,7 +229,8 @@ public class ApOrchestrator
         {
             Value = item,
             Confidence = item.Confidence,
-            SourceBlock = null 
+            Strategy = item.Strategy ?? "Unknown",
+            SourceBlock = item.AnchorBlock 
         };
     }
 }

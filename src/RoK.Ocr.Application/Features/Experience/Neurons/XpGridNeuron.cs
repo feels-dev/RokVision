@@ -17,14 +17,14 @@ public partial class XpGridNeuron
     public List<XpItemEntry> Extract(List<AnalyzedBlock> nodes)
     {
         var foundItems = new List<XpItemEntry>();
-        
+
         // 1. Identify ALL Anchors (Icons/Titles)
         var anchors = new List<(AnalyzedBlock Block, int Val, string Id)>();
         foreach (var node in nodes)
         {
             int val = ParseInt(node.Raw.Text);
             var match = XpVocabulary.TargetBooks.FirstOrDefault(t => t.XpValue == val);
-            
+
             // Accept if value exists and color matches (or if strong value match regardless of color)
             if (match.XpValue > 0 && match.Colors.Contains(node.Raw.DominantColor))
             {
@@ -38,7 +38,7 @@ public partial class XpGridNeuron
         // Calculates the median height of anchors to ignore OCR variations.
         var heights = anchors.Select(a => a.Block.Raw.Box[2][1] - a.Block.Raw.Box[0][1]).OrderBy(h => h).ToList();
         double medianHeight = heights[heights.Count / 2];
-        
+
         // Defines limits based on Screen Average, not individual items.
         double searchRadiusY = medianHeight * 5.5; // Vertical search range
         double maxAlignDevX = medianHeight * 2.0;  // Allowed horizontal deviation
@@ -66,13 +66,13 @@ public partial class XpGridNeuron
                 if (hDiff > maxAlignDevX) continue;
 
                 // Rule 3: Line of Sight (Vertical Blockage)
-                bool isBlocked = anchors.Any(other => 
+                bool isBlocked = anchors.Any(other =>
                     other.Block != anchor.Block &&
-                    other.Block.Raw.Center.Y > anchor.Block.Raw.Center.Y && 
+                    other.Block.Raw.Center.Y > anchor.Block.Raw.Center.Y &&
                     other.Block.Raw.Center.Y < qtyNode.Raw.Center.Y &&
                     Math.Abs(other.Block.Raw.Center.X - anchor.Block.Raw.Center.X) < maxAlignDevX // Same column
                 );
-                
+
                 if (isBlocked) continue;
 
                 // Rule 4: Distance check
@@ -82,11 +82,11 @@ public partial class XpGridNeuron
 
                 if (dist < searchRadiusY)
                 {
-                    matches.Add(new CandidateMatch 
-                    { 
-                        Anchor = anchor, 
-                        QuantityBlock = qtyNode, 
-                        Distance = dist 
+                    matches.Add(new CandidateMatch
+                    {
+                        Anchor = anchor,
+                        QuantityBlock = qtyNode,
+                        Distance = dist
                     });
                 }
             }
@@ -104,7 +104,7 @@ public partial class XpGridNeuron
 
             int qty = ParseInt(match.QuantityBlock.Raw.Text);
             double conf = (match.Anchor.Block.Raw.Confidence + match.QuantityBlock.Raw.Confidence) / 2 * 100;
-            
+
             foundItems.Add(new XpItemEntry
             {
                 ItemId = match.Anchor.Id,
@@ -112,6 +112,7 @@ public partial class XpGridNeuron
                 Quantity = qty,
                 Confidence = Math.Round(conf, 2),
                 DetectedColor = match.Anchor.Block.Raw.DominantColor,
+                Strategy = "XpGrid_SpatialMatch", // <-- ADICIONADO AQUI
                 AnchorBlock = match.Anchor.Block
             });
 
@@ -131,7 +132,8 @@ public partial class XpGridNeuron
                     UnitValue = anchor.Val,
                     Quantity = -1,
                     Confidence = 0,
-                    DetectedColor = anchor.Block.Raw.DominantColor + "_PENDING", 
+                    DetectedColor = anchor.Block.Raw.DominantColor + "_PENDING",
+                    Strategy = "XpGrid_PendingMagnifier", // <-- ADICIONADO AQUI
                     AnchorBlock = anchor.Block
                 });
             }

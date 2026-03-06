@@ -27,39 +27,43 @@ public class ActionPointsController : ControllerBase
     public async Task<IActionResult> Analyze([FromForm] ApUploadRequest request)
     {
         var swGlobal = Stopwatch.StartNew();
+        string correlationId = Guid.NewGuid().ToString();
 
         if (request.Images == null || !request.Images.Any())
         {
-            return BadRequest(ResponseFactory.CreateFailure<ApInventoryData>("No images provided in the request.", "ERR_NO_IMAGES", 400));
+            return BadRequest(ResponseFactory.CreateFailure<ApInventoryData>("No images provided in the request.", "ERR_NO_IMAGES", 400, correlationId));
         }
 
         try
         {
-            _logger.LogInformation("Receiving {Count} AP inventory images for analysis.", request.Images.Count);
+            _logger.LogInformation("Receiving {Count} AP inventory images for analysis. TraceID: {TraceId}", request.Images.Count, correlationId);
 
             // Passing the debug flag
             var (inventoryData, context) = await _orchestrator.ProcessInventoryAsync(request.Images, request.Debug);
 
             swGlobal.Stop();
 
-            // Overall Confidence Calculation (Uses what was logged in Context)
-            double overallConf = inventoryData.Items.Any()
-                ? inventoryData.Items.Average(i => i.Confidence)
-                : 0.0;
+            // Build Enterprise Response
+            // Note: Uses first image dimensions as reference context
+            var imageContext = new ImageContextDto
+            {
+                OriginalWidth = context.ImageWidth > 0 ? context.ImageWidth : 1920,
+                OriginalHeight = context.ImageHeight > 0 ? context.ImageHeight : 1080,
+                ResizedScale = 1.0
+            };
 
             var response = ResponseFactory.CreateSuccess(
-                summary: inventoryData,
-                fields: context.Evidence,
-                auditLog: context.AuditLog,
-                processingTime: swGlobal.Elapsed.TotalSeconds,
-                overallConfidence: overallConf,
-                warnings: context.Warnings
+                businessSummary: inventoryData,
+                context: context,
+                correlationId: correlationId,
+                imageContext: imageContext
             );
 
             // Attaching Debug info if flag is active
             if (request.Debug)
             {
                 response.Debug = context.DebugInfo;
+                context.DebugInfo.Timings["TotalGlobalController"] = swGlobal.Elapsed.TotalMilliseconds;
             }
             else
             {
@@ -71,7 +75,7 @@ public class ActionPointsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Critical error in Action Points endpoint.");
-            return StatusCode(500, ResponseFactory.CreateFailure<ApInventoryData>($"Internal Server Error: {ex.Message}"));
+            return StatusCode(500, ResponseFactory.CreateFailure<ApInventoryData>($"Internal Server Error: {ex.Message}", "ERR_INTERNAL", 500, correlationId));
         }
     }
 }

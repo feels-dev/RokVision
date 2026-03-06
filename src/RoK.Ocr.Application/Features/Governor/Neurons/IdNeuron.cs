@@ -15,13 +15,12 @@ namespace RoK.Ocr.Application.Features.Governor.Neurons;
 public partial class IdNeuron : IOcrNeuron<int>
 {
     // Regex optimized to capture digits 7-10 after common ID labels
-    [GeneratedRegex(@"(ID|1D|lD|Id|id)\s*[:\)\.]?\s*(?<number>\d{7,10})", RegexOptions.Compiled)]
+    [GeneratedRegex(@"(ID|1D|lD|Id|id)\s*[:).]?\s*(?<number>\d{7,10})", RegexOptions.Compiled)]
     private static partial Regex IdStrictRegex();
 
     public ExtractionResult<int> Process(List<AnalyzedBlock> allBlocks, Dictionary<string, AnalyzedBlock> anchors, List<AnalyzedBlock> blacklist)
     {
         // 1. HIGH PRIORITY: Look for blocks containing the literal "ID" label
-        // This is the most reliable way to avoid picking top-screen HUD numbers.
         var strictMatch = allBlocks
             .Where(b => b.Raw.Text.Contains("ID", StringComparison.OrdinalIgnoreCase) ||
                         b.Raw.Text.Contains("Governador", StringComparison.OrdinalIgnoreCase))
@@ -36,16 +35,19 @@ public partial class IdNeuron : IOcrNeuron<int>
 
         if (strictMatch != null)
         {
+            // Dynamically calculate confidence based on the OCR engine's confidence
+            double rawConf = strictMatch.Block.Raw.Confidence > 1 ? strictMatch.Block.Raw.Confidence : strictMatch.Block.Raw.Confidence * 100;
+            
             return new ExtractionResult<int>
             {
                 Value = int.Parse(strictMatch.Match.Groups["number"].Value),
-                Confidence = 98,
+                Confidence = rawConf > 0 ? rawConf : 98, // Fallback if raw is 0
+                Strategy = "IdNeuron_StrictLabel",
                 SourceBlock = strictMatch.Block
             };
         }
 
         // 2. FALLBACK: Look for pure numeric strings if no labeled ID is found
-        // Heuristic: RoK IDs are never at the extreme top (Y < 100) where Power/Resources sit.
         var fallback = allBlocks
             .Except(blacklist)
             .Where(b => b.Type == BlockType.Number || b.Type == BlockType.Unknown)
@@ -56,14 +58,19 @@ public partial class IdNeuron : IOcrNeuron<int>
             .FirstOrDefault();
 
         if (fallback != null)
+        {
+            double rawConf = fallback.Block.Raw.Confidence > 1 ? fallback.Block.Raw.Confidence : fallback.Block.Raw.Confidence * 100;
+            
             return new ExtractionResult<int> 
             { 
                 Value = fallback.Val, 
-                Confidence = 60, 
+                Confidence = rawConf > 0 ? rawConf : 60,
+                Strategy = "IdNeuron_SpatialFallback",
                 SourceBlock = fallback.Block 
             };
+        }
 
-        return new ExtractionResult<int> { Value = 0, Confidence = 0 };
+        return new ExtractionResult<int> { Value = 0, Confidence = 0, Strategy = "Failed" };
     }
 
     private int ExtractDigits(string text)

@@ -24,11 +24,12 @@ public class CivNeuron : IOcrNeuron<string>
             {
                 Value = CleanCivName(civBlock.Raw.Text),
                 Confidence = 90,
+                Strategy = "Civ_DirectMatch",
                 SourceBlock = civBlock
             };
         }
 
-        return new ExtractionResult<string> { Value = "--", Confidence = 0 };
+        return new ExtractionResult<string> { Value = "--", Confidence = 0, Strategy = "Civ_NotFound" };
     }
 
     private string CleanCivName(string text)

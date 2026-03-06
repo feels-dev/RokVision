@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using RoK.Ocr.Api.Dtos.Rally;
 using RoK.Ocr.Application.Common.Dtos;
-using RoK.Ocr.Application.Common.Models; // <-- IMPORTAÇÃO ADICIONADA AQUI!
+using RoK.Ocr.Application.Common.Models;
 using RoK.Ocr.Application.Features.Rally.Orchestrator;
 using RoK.Ocr.Domain.Interfaces;
 using RoK.Ocr.Domain.Models.Rally;
@@ -35,6 +35,7 @@ public class RallyController : ControllerBase
     {
         var swGlobal = Stopwatch.StartNew();
         var savedPaths = new List<string>();
+        string correlationId = Guid.NewGuid().ToString();
 
         // 1. Validation
         if (request.Images == null || request.Images.Count == 0)
@@ -42,7 +43,8 @@ public class RallyController : ControllerBase
             return BadRequest(ResponseFactory.CreateFailure<RallyResult>(
                 "No images provided. Please upload at least one screenshot.", 
                 "ERR_NO_IMAGE", 
-                400));
+                400,
+                correlationId));
         }
 
         try
@@ -59,21 +61,26 @@ public class RallyController : ControllerBase
                 }
             }
 
-            _logger.LogInformation("Starting Rally Analysis with {Count} images.", savedPaths.Count);
+            _logger.LogInformation("Starting Rally Analysis with {Count} images. TraceID: {TraceId}", savedPaths.Count, correlationId);
 
             // 3. Call Orchestrator (The heavy lifting)
             var (result, context) = await _orchestrator.AnalyzeAsync(savedPaths);
 
             swGlobal.Stop();
 
-            // 4. Build Response
+            // 4. Build Enterprise Response
+            var imageContext = new ImageContextDto
+            {
+                OriginalWidth = context.ImageWidth,
+                OriginalHeight = context.ImageHeight,
+                ResizedScale = 1.0 // Currently Rally does not resize in the controller
+            };
+
             var response = ResponseFactory.CreateSuccess(
-                summary: result,
-                fields: context.Evidence, 
-                auditLog: context.AuditLog,
-                processingTime: swGlobal.Elapsed.TotalSeconds,
-                overallConfidence: result.OverallConfidence,
-                warnings: context.Warnings
+                businessSummary: result,
+                context: context,
+                correlationId: correlationId,
+                imageContext: imageContext
             );
 
             // 5. Populate Debug Info
@@ -82,6 +89,7 @@ public class RallyController : ControllerBase
                 response.Debug = context.DebugInfo;
                 // Add specific metadata about the scroll stitch
                 context.DebugInfo.Timings["TotalImages"] = savedPaths.Count;
+                context.DebugInfo.Timings["TotalGlobalController"] = swGlobal.Elapsed.TotalMilliseconds;
             }
             else
             {
@@ -93,7 +101,7 @@ public class RallyController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Critical Error in RallyController");
-            return StatusCode(500, ResponseFactory.CreateFailure<RallyResult>($"Internal error: {ex.Message}"));
+            return StatusCode(500, ResponseFactory.CreateFailure<RallyResult>($"Internal error: {ex.Message}", "ERR_INTERNAL", 500, correlationId));
         }
         finally
         {

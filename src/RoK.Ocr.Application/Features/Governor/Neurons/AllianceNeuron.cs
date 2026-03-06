@@ -13,15 +13,15 @@ public class AllianceNeuron : IOcrNeuron<(string Tag, string Name)>
 {
     public ExtractionResult<(string Tag, string Name)> Process(List<AnalyzedBlock> allBlocks, Dictionary<string, AnalyzedBlock> anchors, List<AnalyzedBlock> blacklist)
     {
-        // 1. DIRECT ATTEMPT: Block classified as TAG (Starts with [)
+        // 1. DIRECT ATTEMPT: Block classified as TAG (Starts with[)
         var tagBlock = allBlocks
             .Except(blacklist)
             .FirstOrDefault(b => b.Type == BlockType.Tag);
-        
+
         if (tagBlock != null)
         {
             var parsed = ParseAllianceString(tagBlock.Raw.Text);
-            
+
             // If the name came back empty, get the right neighbor
             if (string.IsNullOrEmpty(parsed.Name))
             {
@@ -32,7 +32,7 @@ public class AllianceNeuron : IOcrNeuron<(string Tag, string Name)>
             // Accept if the tag is valid (>= 2 chars)
             if (parsed.Tag.Length >= 2 && parsed.Tag != "--")
             {
-                return CreateResult(parsed, 95, tagBlock);
+                return CreateResult(parsed, 95, tagBlock, "Alliance_DirectTag");
             }
         }
 
@@ -40,7 +40,7 @@ public class AllianceNeuron : IOcrNeuron<(string Tag, string Name)>
         if (anchors.ContainsKey("AllianceLabel"))
         {
             var label = anchors["AllianceLabel"];
-            
+
             var candidates = allBlocks
                 .Except(blacklist)
                 .Where(b => b.Type == BlockType.Unknown)
@@ -52,22 +52,22 @@ public class AllianceNeuron : IOcrNeuron<(string Tag, string Name)>
                 if (IsUiKeyword(candidate.Raw.Text)) continue;
 
                 var result = ParseAllianceString(candidate.Raw.Text);
-                
+
                 // If a valid tag was found
-                if (result.Tag.Length >= 2 && result.Tag != "--") 
+                if (result.Tag.Length >= 2 && result.Tag != "--")
                 {
-                    return CreateResult(result, 80, candidate);
+                    return CreateResult(result, 80, candidate, "Alliance_SpatialLabel");
                 }
             }
         }
 
-        return CreateResult(("--", "--"), 0, null);
+        return CreateResult(("--", "--"), 0, null, "Alliance_NotFound");
     }
 
     private (string Tag, string Name) ParseAllianceString(string text)
     {
         text = text.Trim();
-        
+
         // CASE A: Has closing bracket ]
         int closeIndex = text.IndexOf(']');
         if (closeIndex > 0)
@@ -89,7 +89,7 @@ public class AllianceNeuron : IOcrNeuron<(string Tag, string Name)>
         {
             string cleanText = text.Substring(1);
             int spaceIndex = cleanText.IndexOf(' ');
-            
+
             string rawTagPart;
             string namePart;
 
@@ -128,9 +128,15 @@ public class AllianceNeuron : IOcrNeuron<(string Tag, string Name)>
         return clean.Trim();
     }
 
-    private ExtractionResult<(string, string)> CreateResult((string, string) val, double conf, AnalyzedBlock? block)
+    private ExtractionResult<(string, string)> CreateResult((string, string) val, double conf, AnalyzedBlock? block, string strategyName)
     {
-        return new ExtractionResult<(string, string)> { Value = val, Confidence = conf, SourceBlock = block };
+        return new ExtractionResult<(string, string)>
+        {
+            Value = val,
+            Confidence = conf,
+            Strategy = strategyName,
+            SourceBlock = block
+        };
     }
 
     private string CleanName(string text) => Regex.Replace(text, @"[^\w\s\-\[\]\u4e00-\u9fa5]", "").Trim();
