@@ -17,7 +17,8 @@ public class XpItemEntry
     public int Quantity { get; set; }
     public long TotalXp => (long)UnitValue * Quantity;
     public double Confidence { get; set; }
-    
+    public string? Strategy { get; set; } = "Default";
+
     [System.Text.Json.Serialization.JsonIgnore]
     public AnalyzedBlock? AnchorBlock { get; set; }
     public string DetectedColor { get; set; } = "Unknown";

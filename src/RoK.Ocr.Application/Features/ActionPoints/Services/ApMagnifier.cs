@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using RoK.Ocr.Domain.Interfaces;
 using RoK.Ocr.Domain.Models;
-using RoK.Ocr.Application.Common.Models; // Important
+using RoK.Ocr.Application.Common.Models; 
 
 namespace RoK.Ocr.Application.Features.ActionPoints.Services;
 
@@ -22,7 +22,7 @@ public class ApMagnifier
 
     public async Task<List<OcrBlock>> RescanQuantitiesAsync(string imagePath, List<AnalyzedBlock> lowConfidenceBlocks, OcrAnalysisContext context)
     {
-        context.StartTimer("ApMagnifierBatch"); // Time Magnifier
+        context.StartTimer("ApMagnifierBatch"); 
         
         if (!lowConfidenceBlocks.Any()) 
         {
@@ -47,12 +47,12 @@ public class ApMagnifier
             batchRequests.Add(($"{block.Raw.Text}_bin", new[] { x, y, w, h }, "HighContrastBinary"));
         }
 
-        context.Log($"[ApMagnifier] Sending {batchRequests.Count} regions for re-analysis.");
+        context.Log("ApMagnifier", $"Sending {batchRequests.Count} regions for re-analysis.");
 
         var results = await _ocrService.AnalyzeBatchAsync(imagePath, batchRequests);
 
-        context.StopTimer("ApMagnifierBatch"); // Stop timer
-        context.Log($"[ApMagnifier] Batch finished. Found {results.Count} candidates.");
+        context.StopTimer("ApMagnifierBatch"); 
+        context.Log("ApMagnifier", $"Batch finished. Found {results.Count} candidates.");
 
         return results
             .Where(r => r.Confidence > 0.75 && r.Text.Any(char.IsDigit))

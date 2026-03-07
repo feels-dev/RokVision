@@ -19,7 +19,7 @@ public class GovernorController : ControllerBase
     private readonly IImageStorage _storage;
     private readonly IOcrService _ocrService;
     private readonly ILogger<GovernorController> _logger;
-    private const int MAX_WIDTH = 1920; 
+    private const int MAX_WIDTH = 1920;
 
     public GovernorController(GovernorOrchestrator orchestrator, IImageStorage storage, IOcrService ocrService, ILogger<GovernorController> logger)
     {
@@ -35,7 +35,7 @@ public class GovernorController : ControllerBase
     {
         // 1. Global Request Start
         var swGlobal = Stopwatch.StartNew();
-        
+
         if (request.Image == null || request.Image.Length == 0)
             return BadRequest(ResponseFactory.CreateFailure<GovernorProfile>("No image sent.", "ERR_NO_IMAGE", 400));
 
@@ -89,7 +89,8 @@ public class GovernorController : ControllerBase
                 return Ok(ResponseFactory.CreateFailure<GovernorProfile>("Could not detect text.", "ERR_OCR_EMPTY", 200));
 
             // 5. Orchestration
-            var (profile, context) = await _orchestrator.AnalyzeAsync(physicalPath, initialRead.Blocks, request.DraftId ?? 0);
+            string correlationId = Guid.NewGuid().ToString();
+            var (profile, context) = await _orchestrator.AnalyzeAsync(physicalPath, initialRead.Blocks, originalWidth, originalHeight, request.DraftId ?? 0);
 
             // =================================================================
             // 6. POPULATING DEBUG (If requested)
@@ -98,40 +99,39 @@ public class GovernorController : ControllerBase
             {
                 // Fill heavy data only if flag == true
                 context.DebugInfo.RawText = initialRead.FullText;
-                context.DebugInfo.Image = new ImageMetaDto
-                {
-                    Path = physicalPath,
-                    Width = originalWidth,
-                    Height = originalHeight,
-                    ResizeScale = resizeScale
-                };
-                
+                context.DebugInfo.ImagePath = physicalPath;
+
                 // Add Python time to context timings
                 context.DebugInfo.Timings["PythonInitialRead"] = swPython.Elapsed.TotalMilliseconds;
             }
 
             swGlobal.Stop();
+            context.DebugInfo.Timings["TotalGlobalController"] = swGlobal.Elapsed.TotalMilliseconds;
 
-            double globalConfidence = context.Evidence.Any() ? context.Evidence.Values.Average(e => e.Confidence) : 0.0;
+            // Create the standardized Image Context
+            var imageContext = new ImageContextDto
+            {
+                OriginalWidth = originalWidth,
+                OriginalHeight = originalHeight,
+                ResizedScale = resizeScale
+            };
 
+            // Leverage the smart ResponseFactory to build the Enterprise JSON
             var response = ResponseFactory.CreateSuccess(
-                summary: profile,
-                fields: context.Evidence,
-                auditLog: context.AuditLog,
-                processingTime: swGlobal.Elapsed.TotalSeconds,
-                overallConfidence: globalConfidence,
-                warnings: context.Warnings
+                businessSummary: profile,
+                context: context,
+                correlationId: correlationId,
+                imageContext: imageContext
             );
 
             // Attach rich debug object (if Debug=false, properties remain null/empty)
-            // To clean JSON in production, we explicitly set null if not debug
             if (request.Debug)
             {
                 response.Debug = context.DebugInfo;
             }
             else
             {
-                response.Debug = null; 
+                response.Debug = null;
             }
 
             return Ok(response);

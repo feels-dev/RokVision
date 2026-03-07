@@ -36,10 +36,10 @@ public class GovernorMagnifier
     }
 
     public async Task<List<OcrBlock>> HuntForField(
-        string imagePath,
-        AnalyzedBlock anchor,
-        string fieldType,
-        OcrAnalysisContext context)
+    string imagePath,
+    AnalyzedBlock anchor,
+    string fieldType,
+    OcrAnalysisContext context)
     {
         // Start specific timer for this field
         context.StartTimer($"Magnifier_{fieldType}");
@@ -120,8 +120,8 @@ public class GovernorMagnifier
                         finalSuccess = true;
                         winningStrategy = strategy.Name;
 
-                        // Log success in context
-                        context.Log($"[Magnifier] Hit on {fieldType} using {strategy.Name}: '{readText}'");
+                        // Log success in context using the new Trace format
+                        context.Log($"Magnifier_{fieldType}", $"Hit on {fieldType} using {strategy.Name}: '{readText}'");
 
                         return RemapCoordinates(result.Blocks, roi, strategy.ScaleFactor);
                     }

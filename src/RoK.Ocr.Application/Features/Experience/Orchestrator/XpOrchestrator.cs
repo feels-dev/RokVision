@@ -10,8 +10,8 @@ using RoK.Ocr.Application.Features.Experience.Neurons;
 using RoK.Ocr.Application.Features.Experience.Services;
 using RoK.Ocr.Domain.Interfaces;
 using RoK.Ocr.Domain.Models.Experience;
-using RoK.Ocr.Application.Common.Models; // Import Context
-using RoK.Ocr.Domain.Models; // For ExtractionResult Helper
+using RoK.Ocr.Application.Common.Models;
+using RoK.Ocr.Domain.Models;
 
 namespace RoK.Ocr.Application.Features.Experience.Orchestrator;
 
@@ -39,17 +39,17 @@ public class XpOrchestrator
     {
         var finalData = new XpInventoryData();
         var itemTracker = new Dictionary<string, XpItemEntry>();
-        var context = new OcrAnalysisContext(); 
-        context.StartTimer("TotalOrchestration"); // Total Timer
+        var context = new OcrAnalysisContext();
+        context.StartTimer("TotalOrchestration");
 
-        context.Log($"Starting XP inventory analysis for {images.Count} images.");
+        context.Log("XpOrchestrator", $"Starting XP inventory analysis for {images.Count} images.");
 
         int imgIndex = 0;
 
         foreach (var image in images)
         {
             imgIndex++;
-            context.StartTimer($"Image_{imgIndex}_Total"); // Timer per Image
+            context.StartTimer($"Image_{imgIndex}_Total");
 
             string tempPath = "";
             try
@@ -64,29 +64,44 @@ public class XpOrchestrator
                 var (rawBlocks, fullText) = await _ocrService.AnalyzeInventoryAsync(tempPath);
                 context.StopTimer($"Image_{imgIndex}_Python");
 
-                context.Log($"[IMG {imgIndex}] OCR Scan Complete. Found {rawBlocks?.Count ?? 0} blocks.");
-                
+                // Get Image Dimensions for Context (using first image as reference)
+                if (imgIndex == 1)
+                {
+                    using (var imgInfo = await SixLabors.ImageSharp.Image.LoadAsync(tempPath))
+                    {
+                        context.ImageWidth = imgInfo.Width;
+                        context.ImageHeight = imgInfo.Height;
+                        context.DebugInfo.ImagePath = tempPath;
+                    }
+                }
+
+                context.Log("XpOrchestrator", $"[IMG {imgIndex}] OCR Scan Complete. Found {rawBlocks?.Count ?? 0} blocks.");
+
                 // Log RawText in Debug
                 if (debugMode && fullText.Length > 0)
                 {
                     context.DebugInfo.RawText += $"--- IMG {imgIndex} ---\n{fullText}\n";
                 }
-                
+
                 if (rawBlocks == null || !rawBlocks.Any()) continue;
 
                 // 2. Initial Extraction
                 context.StartTimer($"Image_{imgIndex}_Logic");
                 var nodes = BlockClassifier.Classify(rawBlocks);
                 var itemsFound = _gridNeuron.Extract(nodes);
-                context.Log($"[IMG {imgIndex}] Initial extraction found {itemsFound.Count} potential items.");
+                context.Log("XpOrchestrator", $"[IMG {imgIndex}] Initial extraction found {itemsFound.Count} potential items.");
 
                 // 3. KEY STEP: Call the Magnifier (Sniper Mode)
-                // Passing Context
-                await _magnifier.ResolveMissingQuantitiesAsync(tempPath, itemsFound, context); 
+                if (itemsFound.Any(i => i.Quantity == -1))
+                {
+                    context.ExecutionTrace.MagnifierUsed = true;
+                }
+
+                await _magnifier.ResolveMissingQuantitiesAsync(tempPath, itemsFound, context);
 
                 // --- SANITY CHECK & Merge Logic ---
                 int recoveredCount = 0;
-                
+
                 foreach (var item in itemsFound)
                 {
                     string fieldKey = $"xp_{item.ItemId}";
@@ -98,66 +113,72 @@ public class XpOrchestrator
 
                     if (isDuplicateValue)
                     {
-                        context.LogWarning("WARN_GHOST_READ", $"Discarded {item.ItemId} (Qty: {item.Quantity}) because it duplicates a higher confidence neighbor (Ghost Read).", fieldKey);
+                        context.LogWarning("ConsistencyAuditor", "WARN_GHOST_READ", $"Discarded {item.ItemId} (Qty: {item.Quantity}) because it duplicates a higher confidence neighbor (Ghost Read).", "LOW", fieldKey);
                         continue;
                     }
 
                     if (item.Quantity == -1)
                     {
-                        context.LogWarning("WARN_QUANTITY_MISSING", $"Could not read quantity for {item.ItemId} (Color: {item.DetectedColor}).", fieldKey);
+                        context.LogWarning("ConsistencyAuditor", "WARN_QUANTITY_MISSING", $"Could not read quantity for {item.ItemId} (Color: {item.DetectedColor}).", "MEDIUM", fieldKey);
                         continue;
                     }
-                    
+
                     if (item.Confidence > 0)
                     {
-                        recoveredCount++; // Count items successfully extracted or confirmed
+                        recoveredCount++;
 
                         if (itemTracker.TryGetValue(item.ItemId, out var existing))
                         {
                             if (existing.Quantity != item.Quantity)
                             {
-                                bool useNew = item.Quantity > existing.Quantity; 
-                                context.LogWarning("WARN_ITEM_CONFLICT", $"Item '{item.ItemId}' conflict. Values: {existing.Quantity} vs {item.Quantity}. Using {(useNew ? item.Quantity : existing.Quantity)}.", fieldKey);
+                                bool useNew = item.Quantity > existing.Quantity;
+                                context.LogWarning("ConsistencyAuditor", "WARN_ITEM_CONFLICT", $"Item '{item.ItemId}' conflict. Values: {existing.Quantity} vs {item.Quantity}. Using {(useNew ? item.Quantity : existing.Quantity)}.", "MEDIUM", fieldKey);
 
-                                if (useNew) { itemTracker[item.ItemId] = item; context.RegisterResult(fieldKey, CreateExtractionResult(item), "XpItemNeuron_Conflict_New"); }
+                                if (useNew)
+                                {
+                                    itemTracker[item.ItemId] = item;
+                                    context.RegisterResult(fieldKey, CreateExtractionResult(item), "XpItemNeuron_Conflict_New", isCorrection: true);
+                                }
                             }
                             else if (item.Confidence > existing.Confidence)
                             {
-                                itemTracker[item.ItemId] = item; context.RegisterResult(fieldKey, CreateExtractionResult(item), "XpItemNeuron_Confidence_Update");
+                                itemTracker[item.ItemId] = item;
+                                context.RegisterResult(fieldKey, CreateExtractionResult(item), "XpItemNeuron_Confidence_Update", isCorrection: true);
                             }
                         }
                         else
                         {
-                            itemTracker.Add(item.ItemId, item); context.RegisterResult(fieldKey, CreateExtractionResult(item), "XpItemNeuron_New");
+                            itemTracker.Add(item.ItemId, item);
+                            context.RegisterResult(fieldKey, CreateExtractionResult(item), item.Strategy ?? "XpItemNeuron_Direct", isCorrection: true);
                         }
                     }
                 }
-                
-                // Register Magnifier result
+
                 if (debugMode)
                 {
-                    // Since ResolveMissingQuantitiesAsync modifies itemsFound in-place, simple count suffices.
                     context.RegisterMagnifierAttempt($"Image {imgIndex} XP Resolution", 1, $"Recovered {recoveredCount} items", recoveredCount > 0);
                 }
-                
+
                 context.StopTimer($"Image_{imgIndex}_Logic");
             }
             catch (Exception ex)
             {
-                context.LogError($"[System Error] Failed to process image {image.FileName}: {ex.Message}");
+                context.LogError("XpOrchestrator", $"[System Error] Failed to process image {image.FileName}: {ex.Message}");
                 _logger.LogError(ex, "Error processing XP image.");
             }
             finally
             {
-                if (!string.IsNullOrEmpty(tempPath)) _storage.DeleteImage(tempPath);
+                if (!string.IsNullOrEmpty(tempPath) && File.Exists(tempPath))
+                {
+                    try { File.Delete(tempPath); } catch { }
+                }
                 context.StopTimer($"Image_{imgIndex}_Total");
             }
         }
 
-        finalData.Items = itemTracker.Values.OrderByDescending(i => i.Confidence).ToList(); 
+        finalData.Items = itemTracker.Values.OrderByDescending(i => i.Confidence).ToList();
 
         context.StopTimer("TotalOrchestration");
-        context.AuditLog.Add($"[INFO] Final XP Inventory Confidence: {finalData.Items.Average(i => i.Confidence):F2}%");
 
         return (finalData, context);
     }
@@ -168,7 +189,8 @@ public class XpOrchestrator
         {
             Value = item,
             Confidence = item.Confidence,
-            SourceBlock = null
+            Strategy = item.Strategy ?? "Unknown",
+            SourceBlock = item.AnchorBlock
         };
     }
 }

@@ -32,19 +32,25 @@ public class GovernorOrchestrator
     public async Task<(GovernorProfile Profile, OcrAnalysisContext Context)> AnalyzeAsync(
         string imagePath,
         List<OcrBlock> rawBlocks,
+        int imageWidth,
+        int imageHeight,
         int draftId = 0)
     {
         // 1. Initialize Audit Context and Total Timer
-        var context = new OcrAnalysisContext();
+        var context = new OcrAnalysisContext
+        {
+            ImageWidth = imageWidth,
+            ImageHeight = imageHeight
+        };
         context.StartTimer("TotalOrchestration");
 
-        context.Log($"Starting orchestration for image: {System.IO.Path.GetFileName(imagePath)}");
+        context.Log("Orchestrator", $"Starting orchestration for image: {System.IO.Path.GetFileName(imagePath)}");
 
         var finalData = new GovernorProfile();
 
         // 2. Initial Classification (with timing)
         context.StartTimer("Classification");
-        context.Log($"Classifying {rawBlocks.Count} raw blocks...");
+        context.Log("BlockClassifier", $"Classifying {rawBlocks.Count} raw blocks...");
         var analyzedBlocks = BlockClassifier.Classify(rawBlocks);
         context.StopTimer("Classification");
 
@@ -54,7 +60,7 @@ public class GovernorOrchestrator
         // Self-Correction Loop
         while (keepTrying && attempts < 3)
         {
-            context.Log($"--- Cycle {attempts + 1} Start ---");
+            context.Log("Orchestrator", $"--- Cycle {attempts + 1} Start ---");
             context.StartTimer($"Cycle_{attempts + 1}");
 
             var usedBlocks = new HashSet<AnalyzedBlock>();
@@ -79,12 +85,12 @@ public class GovernorOrchestrator
                     usedBlocks.Add(idResult.SourceBlock);
                     anchors["ID"] = idResult.SourceBlock;
                 }
-                context.RegisterResult("id", idResult, "IdNeuron");
+                context.RegisterResult("id", idResult, idResult.Strategy);
             }
             else
             {
                 finalData.Id = draftId;
-                context.LogWarning("WARN_ID_NOT_FOUND", "ID could not be read. Using Draft/Zero.", "id");
+                context.LogWarning("Orchestrator", "WARN_ID_NOT_FOUND", "ID could not be read. Using Draft/Zero.", "MEDIUM", "id");
             }
 
             // ---------------------------------------------------------
@@ -97,7 +103,7 @@ public class GovernorOrchestrator
             finalData.Power = powerResult.Value;
 
             if (powerResult.SourceBlock != null) usedBlocks.Add(powerResult.SourceBlock);
-            context.RegisterResult("power", powerResult, "StatsNeuron_Power");
+            context.RegisterResult("power", powerResult, powerResult.Strategy);
 
             // ---------------------------------------------------------
             // 3. KILL POINTS
@@ -110,7 +116,7 @@ public class GovernorOrchestrator
             finalData.KillPoints = kpResult.Value;
 
             if (kpResult.SourceBlock != null) usedBlocks.Add(kpResult.SourceBlock);
-            context.RegisterResult("killPoints", kpResult, "StatsNeuron_KP");
+            context.RegisterResult("killPoints", kpResult, kpResult.Strategy);
 
             // ---------------------------------------------------------
             // 4. ALLIANCE (Tuple handling)
@@ -121,22 +127,22 @@ public class GovernorOrchestrator
 
             if (allianceResult.SourceBlock != null) usedBlocks.Add(allianceResult.SourceBlock);
 
-            RegisterTupleField(context, "allianceTag", allianceResult.Value.Item1, allianceResult, "AllianceNeuron");
-            RegisterTupleField(context, "allianceName", allianceResult.Value.Item2, allianceResult, "AllianceNeuron");
+            RegisterTupleField(context, "allianceTag", allianceResult.Value.Item1, allianceResult, allianceResult.Strategy);
+            RegisterTupleField(context, "allianceName", allianceResult.Value.Item2, allianceResult, allianceResult.Strategy);
 
             // ---------------------------------------------------------
             // 5. CIVILIZATION
             // ---------------------------------------------------------
             var civResult = RunNeuronWithRetry(_civNeuron, analyzedBlocks, anchors, "--", usedBlocks);
             finalData.Civilization = civResult.Value;
-            context.RegisterResult("civilization", civResult, "CivNeuron");
+            context.RegisterResult("civilization", civResult, civResult.Strategy);
 
             // ---------------------------------------------------------
             // 6. NAME
             // ---------------------------------------------------------
             var nameResult = RunNeuronWithRetry(_nameNeuron, analyzedBlocks, anchors, "--", usedBlocks);
             finalData.Name = nameResult.Value;
-            context.RegisterResult("name", nameResult, "NameNeuron");
+            context.RegisterResult("name", nameResult, nameResult.Strategy);
 
             // ---------------------------------------------------------
             // PHASE 2: AUDIT AND DECISION
@@ -153,7 +159,8 @@ public class GovernorOrchestrator
 
             if (isPerfect)
             {
-                context.Log("Cycle Audit: Perfect Match. Exiting loop.");
+                context.ExecutionTrace.IsPerfectMatch = true;
+                context.Log("Orchestrator", "Cycle Audit: Perfect Match. Exiting loop.");
                 break;
             }
 
@@ -174,23 +181,22 @@ public class GovernorOrchestrator
 
                 if (idAnchor != null)
                 {
-                    context.Log("Scheduling Magnifier for: ID");
+                    context.Log("MagnifierScheduler", "Scheduling Magnifier for: ID");
                     taskId = _magnifier.HuntForField(imagePath, idAnchor, "ID", context);
                     scheduledTask = true;
                 }
                 else
                 {
-                    context.LogWarning("WARN_NO_ID_ANCHOR", "Cannot magnify ID: 'Governor/ID' label not found.", "id");
+                    context.LogWarning("MagnifierScheduler", "WARN_NO_ID_ANCHOR", "Cannot magnify ID: 'Governor/ID' label not found.", "MEDIUM", "id");
                 }
             }
 
-            // Pass 'context' to Magnifier for attempt logging
             if (finalData.Civilization == "--")
             {
                 var labelAnchor = anchors.ContainsKey("CivLabel") ? anchors["CivLabel"] : null;
                 if (labelAnchor != null)
                 {
-                    context.Log("Scheduling Magnifier for: Civilization");
+                    context.Log("MagnifierScheduler", "Scheduling Magnifier for: Civilization");
                     taskCiv = _magnifier.HuntForField(imagePath, labelAnchor, "Civilization", context);
                     scheduledTask = true;
                 }
@@ -201,7 +207,7 @@ public class GovernorOrchestrator
                 var labelAnchor = anchors.ContainsKey("PowerLabel") ? anchors["PowerLabel"] : null;
                 if (labelAnchor != null)
                 {
-                    context.Log("Scheduling Magnifier for: Power");
+                    context.Log("MagnifierScheduler", "Scheduling Magnifier for: Power");
                     taskPower = _magnifier.HuntForField(imagePath, labelAnchor, "Power", context);
                     scheduledTask = true;
                 }
@@ -212,7 +218,7 @@ public class GovernorOrchestrator
                 var idAnchor = anchors.ContainsKey("ID") ? anchors["ID"] : null;
                 if (idAnchor != null)
                 {
-                    context.Log("Scheduling Magnifier for: Name");
+                    context.Log("MagnifierScheduler", "Scheduling Magnifier for: Name");
                     taskName = _magnifier.HuntForField(imagePath, idAnchor, "Name", context);
                     scheduledTask = true;
                 }
@@ -220,13 +226,14 @@ public class GovernorOrchestrator
 
             if (!scheduledTask)
             {
-                context.Log("No further magnification possible. Stopping.");
+                context.Log("Orchestrator", "No further magnification possible. Stopping.");
                 keepTrying = false;
                 continue;
             }
 
             // Timer for Magnifier wait
             context.StartTimer("MagnifierWait");
+            context.ExecutionTrace.MagnifierUsed = true;
 
             var activeTasks = new List<Task<List<OcrBlock>>>();
             if (taskCiv != null) activeTasks.Add(taskCiv);
@@ -243,27 +250,27 @@ public class GovernorOrchestrator
 
             if (taskCiv != null && taskCiv.Result.Any())
             {
-                context.Log($"Magnifier found {taskCiv.Result.Count} blocks for Civ.");
+                context.Log("Orchestrator", $"Magnifier found {taskCiv.Result.Count} blocks for Civ.");
                 analyzedBlocks.AddRange(BlockClassifier.Classify(taskCiv.Result));
                 foundNewInfo = true;
             }
 
             if (taskPower != null && taskPower.Result.Any())
             {
-                context.Log($"Magnifier found {taskPower.Result.Count} blocks for Power.");
+                context.Log("Orchestrator", $"Magnifier found {taskPower.Result.Count} blocks for Power.");
                 analyzedBlocks.AddRange(BlockClassifier.Classify(taskPower.Result));
                 foundNewInfo = true;
             }
 
             if (taskName != null && taskName.Result.Any())
             {
-                context.Log($"Magnifier found {taskName.Result.Count} blocks for Name.");
+                context.Log("Orchestrator", $"Magnifier found {taskName.Result.Count} blocks for Name.");
                 analyzedBlocks.AddRange(BlockClassifier.Classify(taskName.Result));
                 foundNewInfo = true;
             }
             if (taskId != null && taskId.Result.Any())
             {
-                context.Log($"Magnifier found {taskId.Result.Count} blocks for ID.");
+                context.Log("Orchestrator", $"Magnifier found {taskId.Result.Count} blocks for ID.");
                 analyzedBlocks.AddRange(BlockClassifier.Classify(taskId.Result));
                 foundNewInfo = true;
             }
@@ -274,7 +281,7 @@ public class GovernorOrchestrator
         }
 
         context.StopTimer("TotalOrchestration");
-        context.Log("Orchestration finished.");
+        context.Log("Orchestrator", "Orchestration finished.");
 
         return (finalData, context);
     }
@@ -285,31 +292,15 @@ public class GovernorOrchestrator
 
     private void RegisterTupleField<T>(OcrAnalysisContext context, string key, string value, ExtractionResult<T> parentResult, string method)
     {
-        var evidence = new FieldEvidenceDto
+        // Create a mock extraction result to leverage the smart context registration
+        var dummyResult = new ExtractionResult<string>
         {
             Value = value,
-            Raw = parentResult.SourceBlock?.Raw.Text ?? "",
-            Confidence = Math.Round(parentResult.Confidence, 2),
-            Method = method,
-            Box = parentResult.SourceBlock != null ? ExtractBox(parentResult.SourceBlock) : null
+            Confidence = parentResult.Confidence,
+            SourceBlock = parentResult.SourceBlock
         };
 
-        if (context.Evidence.ContainsKey(key)) context.Evidence[key] = evidence;
-        else context.Evidence.Add(key, evidence);
-    }
-
-    private List<int>? ExtractBox(AnalyzedBlock block)
-    {
-        try
-        {
-            var rawBox = block.Raw.Box;
-            int x = (int)rawBox[0][0];
-            int y = (int)rawBox[0][1];
-            int w = (int)(rawBox[1][0] - rawBox[0][0]);
-            int h = (int)(rawBox[2][1] - rawBox[1][1]);
-            return new List<int> { x, y, w, h };
-        }
-        catch { return null; }
+        context.RegisterResult(key, dummyResult, method);
     }
 
     private ExtractionResult<T> RunNeuronWithRetry<T>(
@@ -342,7 +333,7 @@ public class GovernorOrchestrator
 
         return bestResult != null && bestResult.Confidence > 0
             ? bestResult
-            : new ExtractionResult<T> { Value = defaultValue, Confidence = 0 };
+            : new ExtractionResult<T> { Value = defaultValue, Confidence = 0, Strategy = "Failed" };
     }
 
     private Dictionary<string, AnalyzedBlock> MapAnchors(List<AnalyzedBlock> blocks)
@@ -356,7 +347,6 @@ public class GovernorOrchestrator
         }
 
         AddAnchor("GovLabel", RokVocabulary.GovernorLabels);
-
         AddAnchor("AllianceLabel", RokVocabulary.AllianceLabels);
         AddAnchor("PowerLabel", RokVocabulary.PowerLabels);
         AddAnchor("KpLabel", RokVocabulary.KillPointsLabels);
@@ -378,15 +368,20 @@ public class GovernorOrchestrator
     {
         if (data.Power > 1_500_000_000)
         {
-            context.LogWarning("WARN_IMPLAUSIBLE_POWER", $"Power ({data.Power}) seemed too high. Swapped with KP.", "power");
+            context.LogWarning("ConsistencyAuditor", "WARN_IMPLAUSIBLE_POWER", $"Power ({data.Power}) seemed too high. Swapped with KP.", "MEDIUM", "power");
+            
             var temp = data.Power;
             data.Power = data.KillPoints;
             data.KillPoints = temp;
+
+            // Mark the fields as corrected so the API consumer knows they were manipulated
+            if (context.ExtractedFields.ContainsKey("power")) context.ExtractedFields["power"].IsCorrection = true;
+            if (context.ExtractedFields.ContainsKey("killPoints")) context.ExtractedFields["killPoints"].IsCorrection = true;
         }
 
         if (data.KillPoints > data.Power && data.Power > 0)
         {
-            context.Log("Note: KP is higher than Power. This is possible for T5 players but rare for new ones.");
+            context.Log("ConsistencyAuditor", "Note: KP is higher than Power. This is possible for T5 players but rare for new ones.");
         }
 
         if (string.IsNullOrWhiteSpace(data.Name)) data.Name = "--";
@@ -400,7 +395,7 @@ public class GovernorOrchestrator
 
         if (!data.IsSuccessfulRead)
         {
-            context.LogError("Audit Failed: Profile is incomplete (Missing ID or critical content).");
+            context.LogError("ConsistencyAuditor", "Audit Failed: Profile is incomplete (Missing ID or critical content).");
         }
     }
 }

@@ -5,39 +5,38 @@ namespace RoK.Ocr.Application.Common.Dtos;
 
 public class DebugInformationDto
 {
-    // Raw full text (heavy, only filled if requested)
+    /// <summary>
+    /// Raw full text extracted by the OCR engine. Heavy property, only filled if requested.
+    /// </summary>
     [JsonPropertyName("rawText")]
     public string? RawText { get; set; }
 
-    [JsonPropertyName("image")]
-    public ImageMetaDto? Image { get; set; }
+    [JsonPropertyName("imagePath")]
+    public string? ImagePath { get; set; }
 
-    // Execution timings (ms)
+    /// <summary>
+    /// Execution timings in milliseconds mapped by component.
+    /// </summary>
     [JsonPropertyName("timings")]
     public Dictionary<string, double> Timings { get; set; } = new();
 
-    // Anchors found by the orchestrator for localization
+    /// <summary>
+    /// Anchors or spatial references found by the orchestrator for localization.
+    /// </summary>
     [JsonPropertyName("anchorsFound")]
     public List<string> AnchorsFound { get; set; } = new();
 
-    // Details if the Magnifier had to run
+    /// <summary>
+    /// Details about magnification attempts.
+    /// </summary>
     [JsonPropertyName("magnifier")]
     public List<MagnifierDebugInfo> Magnifier { get; set; } = new();
-}
 
-public class ImageMetaDto
-{
-    [JsonPropertyName("path")]
-    public string Path { get; set; } = string.Empty;
-
-    [JsonPropertyName("originalWidth")]
-    public int Width { get; set; }
-
-    [JsonPropertyName("originalHeight")]
-    public int Height { get; set; }
-    
-    [JsonPropertyName("resizeScale")]
-    public double ResizeScale { get; set; }
+    /// <summary>
+    /// Object detection metrics provided by the YOLO model.
+    /// </summary>
+    [JsonPropertyName("yoloMetrics")]
+    public Dictionary<string, object> YoloMetrics { get; set; } = new();
 }
 
 public class MagnifierDebugInfo

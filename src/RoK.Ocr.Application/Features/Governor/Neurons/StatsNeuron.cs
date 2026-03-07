@@ -22,8 +22,8 @@ public class StatsNeuron : IOcrNeuron<long>
     // Note: The Orchestrator must pass the correct anchor (PowerLabel or KpLabel) in the dictionary as "TargetLabel"
     public ExtractionResult<long> Process(List<AnalyzedBlock> allBlocks, Dictionary<string, AnalyzedBlock> anchors, List<AnalyzedBlock> blacklist)
     {
-        if (!anchors.ContainsKey("TargetLabel")) 
-            return new ExtractionResult<long> { Value = 0, Confidence = 0 };
+        if (!anchors.ContainsKey("TargetLabel"))
+            return new ExtractionResult<long> { Value = 0, Confidence = 0, Strategy = "Stats_NoAnchor" };
 
         var label = anchors["TargetLabel"];
 
@@ -40,8 +40,8 @@ public class StatsNeuron : IOcrNeuron<long>
             candidates = candidates.Where(x => x.Val > 1000).ToList();
         }
 
-        if (!candidates.Any()) 
-            return new ExtractionResult<long> { Value = 0, Confidence = 0 };
+        if (!candidates.Any())
+            return new ExtractionResult<long> { Value = 0, Confidence = 0, Strategy = "Stats_NotFound" };
 
         // Picks the closest one
         var winner = candidates
@@ -52,6 +52,7 @@ public class StatsNeuron : IOcrNeuron<long>
         {
             Value = winner.Val,
             Confidence = 85,
+            Strategy = "Stats_AnchorProximity",
             SourceBlock = winner.Block
         };
     }

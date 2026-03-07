@@ -34,9 +34,8 @@ public partial class ApItemNeuron
                 int qty = ParseInt(qtyBlock.Raw.Text);
                 if (qty > 0)
                 {
-                    // --- CHANGE: Normalize Confidence to 0-100 Scale ---
                     double rawConf = (titleBlock.Raw.Confidence + qtyBlock.Raw.Confidence) / 2;
-                    double normalizedConf = Math.Round(rawConf * 100, 2); // 0.9698 -> 96.98
+                    double normalizedConf = Math.Round(rawConf * 100, 2); 
 
                     foundItems.Add(new ApItemEntry
                     {
@@ -44,14 +43,17 @@ public partial class ApItemNeuron
                         Name = target.Name,
                         UnitValue = target.Value,
                         Quantity = qty,
-                        Confidence = normalizedConf
+                        Confidence = normalizedConf,
+                        Strategy = "ApItem_SpatialRelative",
+                        AnchorBlock = qtyBlock // The quantity block is the click target for automation
                     });
                 }
             }
         }
         return foundItems;
     }
-
+    
+    
     private AnalyzedBlock? FindQuantityBlockRelative(AnalyzedBlock anchor, List<AnalyzedBlock> nodes)
     {
         double anchorHeight = anchor.Raw.Box[2][1] - anchor.Raw.Box[0][1];

@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using RoK.Ocr.Domain.Interfaces;
 using RoK.Ocr.Domain.Models;
 using RoK.Ocr.Domain.Models.Experience;
-using RoK.Ocr.Application.Common.Models; // Important: OcrAnalysisContext
+using RoK.Ocr.Application.Common.Models;
 
 namespace RoK.Ocr.Application.Features.Experience.Services;
 
@@ -27,9 +27,9 @@ public class XpMagnifier
     public async Task ResolveMissingQuantitiesAsync(
         string imagePath, 
         List<XpItemEntry> incompleteItems, 
-        OcrAnalysisContext context) // Injected Context
+        OcrAnalysisContext context)
     {
-        context.StartTimer("XpMagnifierBatch"); // Start Timer
+        context.StartTimer("XpMagnifierBatch");
 
         var targets = incompleteItems.Where(i => i.Quantity == -1 && i.AnchorBlock != null).ToList();
         if (!targets.Any()) 
@@ -54,11 +54,10 @@ public class XpMagnifier
             double bottomY = box[2][1];
 
             // --- ADAPTIVE GEOMETRY (Based on Average) ---
-
             // Y: Start slightly above text bottom (overlap)
             int cropY = (int)(bottomY - (medianH * 0.2));
             
-            // Proportional Fixed Height: 4x letter height
+            // Proportional Fixed Height: 4.5x letter height
             int cropH = (int)(medianH * 4.5);
 
             // SHOT 1: Centered (Wide)
@@ -80,7 +79,7 @@ public class XpMagnifier
             batchRequests.Add((id2, new[] { cropX_2, cropY, cropW_2, cropH }, "WhiteIsolation"));
         }
 
-        context.Log($"[XpMagnifier] Disparando {batchRequests.Count} rescans adaptativos para {targets.Count} itens XP pendentes.");
+        context.Log("XpMagnifier", $"Dispatching {batchRequests.Count} adaptive rescans for {targets.Count} pending XP items.");
 
         var results = await _ocrService.AnalyzeBatchAsync(imagePath, batchRequests);
 
@@ -104,14 +103,17 @@ public class XpMagnifier
                         {
                             item.Quantity = qty;
                             item.Confidence = newConf;
+                            // Signal that this item was recovered by the magnifier strategy
+                            item.Strategy = "Magnifier_Rescue_WhiteIsolation";
                             item.DetectedColor = item.DetectedColor.Replace("_PENDING", "");
-                            context.Log($"[Magnifier HIT] Resolved {item.ItemId} to {qty} ({newConf:F2}%)");
+                            context.Log("XpMagnifier", $"[Magnifier HIT] Resolved {item.ItemId} to {qty} ({newConf:F2}%)");
                         }
                         else if (qty > item.Quantity)
                         {
                             item.Quantity = qty;
                             item.Confidence = newConf;
-                            context.Log($"[Magnifier UPDATE] {item.ItemId}: {item.Quantity} -> {qty} (Higher Qty)");
+                            item.Strategy = "Magnifier_Update_WhiteIsolation";
+                            context.Log("XpMagnifier", $"[Magnifier UPDATE] {item.ItemId}: {item.Quantity} -> {qty} (Higher Qty found)");
                         }
                         else if (qty == item.Quantity && newConf > item.Confidence)
                         {
@@ -122,6 +124,6 @@ public class XpMagnifier
             }
         }
         
-        context.StopTimer("XpMagnifierBatch"); // Stop timer
+        context.StopTimer("XpMagnifierBatch");
     }
 }

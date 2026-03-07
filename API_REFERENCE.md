@@ -166,3 +166,61 @@ Uses a Hybrid AI Engine (YOLOv8 + OCR) to extract visible cities from a Kingdom 
       ]
     }
     ```
+
+---
+
+### `POST /api/rally/analyze`
+Extracts intelligence from Alliance War screens. Supports both **Single Rally Details** and **Active Rally Lists**.
+Capable of scrolling (multi-image) and identifying participant commanders, troop counts, and tiers.
+
+*   **Request Body (`multipart/form-data`)**
+    *   `images[]` (file array): One or multiple screenshots of the rally screen.
+    *   `Debug` (boolean, optional)
+
+*   **Response (`data.summary`)**
+    ```jsonc
+    {
+      "rallyId": "X213Y1107_X216Y1094",
+      "leader": {
+        "name": "Feels",
+        "allianceTag": "=DB=",
+        "x": 213,
+        "y": 1107
+      },
+      "target": {
+        "name": "Barbarian Fort",
+        "level": 3,
+        "isNpc": true,
+        "x": 216,
+        "y": 1094
+      },
+      "status": {
+        "state": "Preparing",
+        "timeRemaining": "00:27:53",
+        "currentCapacity": 206000,
+        "maxCapacity": 2200000,
+        "fillPercentage": 9.36
+      },
+      "globalTroops": {
+        "infantry": 135998,
+        "cavalry": 70002,
+        "archer": 0,
+        "siege": 0
+      },
+      "participants": [
+        {
+          "name": "Montigomo",
+          "isLeader": true,
+          "primaryCommander": { "id": "aethelflaed", "canonicalName": "Aethelflaed", "rarity": "Legendary" },
+          "secondaryCommander": { "id": "caocao", "canonicalName": "Cao Cao", "rarity": "Legendary" },
+          "marchStatus": "Arrived",
+          "totalUnits": 206000,
+          "troopDetails": [
+            { "type": "Infantry", "tier": "T5", "count": 135998, "detectedColor": "Gold" },
+            { "type": "Cavalry", "tier": "T5", "count": 70002, "detectedColor": "Gold" }
+          ]
+        }
+        // ... other participants
+      ]
+    }
+    ```

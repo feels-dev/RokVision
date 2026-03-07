@@ -1,12 +1,11 @@
-using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace RoK.Ocr.Application.Common.Dtos;
 
 /// <summary>
-/// Standardized response for all RoK Vision API operations.
+/// Standardized Enterprise response for all RoK Vision API operations.
 /// </summary>
-/// <typeparam name="T">Type of returned data (e.g., GovernorProfile, ReportResult)</typeparam>
+/// <typeparam name="T">Type of returned business data (e.g., GovernorProfile, ReportResult)</typeparam>
 public class RokResponse<T>
 {
     [JsonPropertyName("meta")]
@@ -19,14 +18,15 @@ public class RokResponse<T>
     public DataEnvelope<T>? Data { get; set; }
 
     /// <summary>
-    /// Chronological history of OCR decisions (Audit Trail).
+    /// Chronological history of decisions, neural network steps, and automated fixes.
+    /// Replaces the legacy flat AuditLog with a structured telemetry approach.
     /// </summary>
-    [JsonPropertyName("auditLog")]
-    public List<string> AuditLog { get; set; } = new();
+    [JsonPropertyName("executionTrace")]
+    public ExecutionTraceDto ExecutionTrace { get; set; } = new();
 
     /// <summary>
-    /// Optional debug info (image dimensions, raw text, etc).
-    /// </summary>
-    [JsonPropertyName("debug")]
-    public object? Debug { get; set; }
+    /// Optional debug information (image dimensions, raw text, etc).
+    /// Intended for developer troubleshooting only.
+    /// </summary>[JsonPropertyName("debug")]
+    public DebugInformationDto? Debug { get; set; }
 }

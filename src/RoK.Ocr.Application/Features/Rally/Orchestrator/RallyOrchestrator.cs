@@ -64,6 +64,9 @@ public class RallyOrchestrator
         var result = new RallyResult();
         var processedNames = new HashSet<string>();
 
+        // This set accumulates every block used in the final extraction to allow reverse-lookup of confidence
+        var globalUsedBlocks = new HashSet<AnalyzedBlock>();
+
         try
         {
             for (int i = 0; i < imagePaths.Count; i++)
@@ -72,7 +75,7 @@ public class RallyOrchestrator
                 bool isFirstImage = (i == 0);
 
                 context.StartTimer($"Image_{i}_Total");
-                context.Log($"Processing Image {i + 1}/{imagePaths.Count}: {Path.GetFileName(path)}");
+                context.Log("RallyOrchestrator", $"Processing Image {i + 1}/{imagePaths.Count}: {Path.GetFileName(path)}");
 
                 context.StartTimer($"Image_{i}_Python");
                 var (rawBlocks, _) = await _ocrService.AnalyzeImageAsync(path);
@@ -83,78 +86,82 @@ public class RallyOrchestrator
                 {
                     imgW = imgInfo.Width;
                     imgH = imgInfo.Height;
-                    if (context.DebugInfo.Image == null) context.DebugInfo.Image = new ImageMetaDto { Path = path, Width = imgW, Height = imgH };
+                }
+
+                if (isFirstImage)
+                {
+                    // Propagates image dimensions to context for Global Normalized Coordinates processing
+                    context.ImageWidth = imgW;
+                    context.ImageHeight = imgH;
+
+                    // FIX: Updated to match the new DebugInformationDto structure
+                    // We no longer use 'ImageMetaDto' inside DebugInfo, just the simple Path string.
+                    if (string.IsNullOrEmpty(context.DebugInfo.ImagePath))
+                        context.DebugInfo.ImagePath = path;
                 }
 
                 var analyzedBlocks = rawBlocks.Select(b => new AnalyzedBlock { Raw = b, CanvasWidth = imgW, CanvasHeight = imgH }).ToList();
-                var usedBlocks = new HashSet<AnalyzedBlock>();
+                var usedBlocksInFrame = new HashSet<AnalyzedBlock>();
 
                 context.StartTimer($"Image_{i}_Slicing");
 
-                // 1. CONTEXT ANALYSIS: Determine the current UI screen
+                // 1. CONTEXT ANALYSIS
                 RallyScreenContext screenContext = RallyScreenContext.Unknown;
-
                 var listTitleAnchor = analyzedBlocks.FirstOrDefault(b =>
                     RallyVocabulary.TroopDetailsHeaders.Any(h => Fuzz.PartialRatio(b.Raw.Text.ToLower(), h.ToLower()) > 80));
 
                 var isMultiListScreen = analyzedBlocks.Any(b => b.Raw.Text.Contains("Mais Recente", StringComparison.OrdinalIgnoreCase)) ||
                                         analyzedBlocks.Count(b => b.Raw.Text.Contains("Forte Bárbaro", StringComparison.OrdinalIgnoreCase)) > 1;
 
-                if (listTitleAnchor != null)
-                    screenContext = RallyScreenContext.SingleDetails;
-                else if (isMultiListScreen)
-                    screenContext = RallyScreenContext.MultiList;
-                else
-                    screenContext = RallyScreenContext.SingleDetails; // Fallback to Single Details
+                if (listTitleAnchor != null) screenContext = RallyScreenContext.SingleDetails;
+                else if (isMultiListScreen) screenContext = RallyScreenContext.MultiList;
+                else screenContext = RallyScreenContext.SingleDetails;
 
-                context.Log($"Screen Context Identified: {screenContext}");
+                context.Log("RallyOrchestrator", $"Screen Context Identified: {screenContext}");
 
-                // 2. CONTEXT-AWARE DYNAMIC BOUNDARY DEFINITION
+                // 2. DYNAMIC BOUNDARY DEFINITION
                 double titleY;
                 double listStartY;
 
                 if (screenContext == RallyScreenContext.SingleDetails)
                 {
-                    // Standard behavior for the Details screen
                     titleY = listTitleAnchor != null ? GetYRatio(listTitleAnchor, imgH) : 0.40;
-
                     var firstParticipantAnchor = analyzedBlocks.FirstOrDefault(b =>
                         b.Raw.Box[0][0] / (double)imgW < 0.50 &&
                         Regex.IsMatch(b.Raw.Text, @"(Nv\.|Lvl|Level)\s*\d+", RegexOptions.IgnoreCase) &&
-                        GetYRatio(b, imgH) > titleY); // Ensures the participant anchor is positioned below the global troop summary
+                        GetYRatio(b, imgH) > titleY);
 
                     listStartY = firstParticipantAnchor != null ? GetYRatio(firstParticipantAnchor, imgH) : 0.60;
                 }
                 else
                 {
-                    // Multi-Rally screen: No global summary or participant list available.
-                    // Isolates the topmost Rally card.
                     var secondRallyAnchor = analyzedBlocks
                         .Where(b => Regex.IsMatch(b.Raw.Text, @"(Nv\.|Lvl|Level)\s*\d+", RegexOptions.IgnoreCase))
-                        .OrderBy(b => b.Raw.Box[0][1]) // Orders strictly from top to bottom
-                        .Skip(1).FirstOrDefault(); // Identifies the second target anchor to define the bottom boundary of the first card
+                        .OrderBy(b => b.Raw.Box[0][1])
+                        .Skip(1).FirstOrDefault();
 
                     titleY = secondRallyAnchor != null ? GetYRatio(secondRallyAnchor, imgH) - 0.05 : 1.0;
-                    listStartY = 1.0; // Bypasses participant extraction
+                    listStartY = 1.0;
                 }
 
                 if (isFirstImage)
                 {
-                    // Header and Target nodes are located ABOVE the defined Y-axis threshold
-                    _headerNeuron.Extract(analyzedBlocks, result, usedBlocks, titleY, imgW, imgH);
-                    _targetNeuron.Extract(analyzedBlocks, result, usedBlocks, titleY, imgW, imgH);
+                    _headerNeuron.Extract(analyzedBlocks, result, usedBlocksInFrame, titleY, imgW, imgH);
+                    _targetNeuron.Extract(analyzedBlocks, result, usedBlocksInFrame, titleY, imgW, imgH);
 
                     if (screenContext == RallyScreenContext.SingleDetails)
                     {
-                        // Troop summary is exclusive to the Single Details screen
-                        _summaryNeuron.Extract(analyzedBlocks, result, usedBlocks, titleY, listStartY, imgW, imgH);
+                        _summaryNeuron.Extract(analyzedBlocks, result, usedBlocksInFrame, titleY, listStartY, imgW, imgH);
                     }
 
                     result.RallyId = $"X{result.Leader.X}Y{result.Leader.Y}_X{result.Target.X}Y{result.Target.Y}";
                 }
                 context.StopTimer($"Image_{i}_Slicing");
 
-                // 3. PARTICIPANT EXTRACTION (Single Details context only)
+                // Accumulate used blocks for confidence calculation later
+                foreach (var b in usedBlocksInFrame) globalUsedBlocks.Add(b);
+
+                // 3. PARTICIPANT EXTRACTION
                 if (screenContext == RallyScreenContext.SingleDetails)
                 {
                     int attempts = 0;
@@ -164,15 +171,11 @@ public class RallyOrchestrator
                     while (keepTrying && attempts < 2)
                     {
                         context.StartTimer($"Image_{i}_Cycle_{attempts}");
-
                         var loopGraph = new TopologyGraph(analyzedBlocks, imgW, imgH);
-
-                        // Shifts the boundary slightly upwards to capture top-aligned names
                         double participantSearchY = listStartY - 0.15;
-                        var (extractedParticipants, anchors) = _participantNeuron.ExtractParticipants(loopGraph, usedBlocks, participantSearchY);
+                        var (extractedParticipants, anchors) = _participantNeuron.ExtractParticipants(loopGraph, usedBlocksInFrame, participantSearchY);
 
                         participants = extractedParticipants;
-
                         var defectiveParticipants = participants.Where(p => p.Name == "--" || p.TotalUnits == 0).ToList();
 
                         if (defectiveParticipants.Any() && attempts < 1)
@@ -198,19 +201,17 @@ public class RallyOrchestrator
                                 continue;
                             }
                         }
-
                         keepTrying = false;
                         context.StopTimer($"Image_{i}_Cycle_{attempts}");
                     }
 
                     context.StartTimer($"Image_{i}_Merge");
-                    if (participants.Any()) await _magnifier.EnrichTroopDetailsAsync(path, participants, analyzedBlocks);
+                    if (participants.Any()) await _magnifier.EnrichTroopDetailsAsync(path, participants, analyzedBlocks, context);
 
                     foreach (var p in participants)
                     {
                         if (string.IsNullOrWhiteSpace(p.Name) || p.Name == "--") continue;
 
-                        // OCR Noise Correction: Reconciles leader name variations
                         if (Fuzz.PartialRatio(p.Name, result.Leader.Name) > 85 || p.Name.EndsWith(result.Leader.Name))
                         {
                             p.Name = result.Leader.Name;
@@ -224,6 +225,9 @@ public class RallyOrchestrator
                         }
                     }
                     context.StopTimer($"Image_{i}_Merge");
+
+                    // Accumulate participant blocks
+                    foreach (var b in usedBlocksInFrame) globalUsedBlocks.Add(b);
                 }
 
                 context.StopTimer($"Image_{i}_Total");
@@ -231,16 +235,27 @@ public class RallyOrchestrator
 
             InferTroopTypes(result, context);
 
-            AuditRally(result, context);
+            // Pass global blocks for accurate confidence calculation
+            AuditRally(result, context, globalUsedBlocks);
 
-            context.RegisterResult("rally_id", CreateResult(result.RallyId), "Orchestrator_Concat");
-            context.RegisterResult("target_name", CreateResult(result.Target.Name), "RallyTargetNeuron");
-            context.RegisterResult("leader_name", CreateResult(result.Leader.Name), "RallyHeaderNeuron");
-            context.RegisterResult("current_capacity", CreateResult(result.Status.CurrentCapacity), "RallyHeaderNeuron");
+            // 4. REGISTER RESULTS WITH REAL CONFIDENCE AND SPATIAL TRACEABILITY
+            var targetEv = FindBlockEvidence(result.Target.Name, globalUsedBlocks);
+            var leaderEv = FindBlockEvidence(result.Leader.Name, globalUsedBlocks);
+            var capEv = FindBlockEvidence(result.Status.CurrentCapacity.ToString(), globalUsedBlocks);
+
+            // Rally ID doesn't have a spatial block (it's generated), so null is acceptable here.
+            context.RegisterResult("rally_id", CreateResult(result.RallyId, "String_Concat", 100.0, null), "RallyOrchestrator");
+
+            // Registering with SourceBlock ensures the API outputs the 'spatial' coordinates
+            context.RegisterResult("target_name", CreateResult(result.Target.Name, result.Target.IsNpc ? "Target_NpcRules" : "Target_PvPRules", targetEv.Confidence, targetEv.SourceBlock), "RallyTargetNeuron");
+
+            context.RegisterResult("leader_name", CreateResult(result.Leader.Name, "Header_TagRegex", leaderEv.Confidence, leaderEv.SourceBlock), "RallyHeaderNeuron");
+
+            context.RegisterResult("current_capacity", CreateResult(result.Status.CurrentCapacity, "Header_CapacityRegex", capEv.Confidence, capEv.SourceBlock), "RallyHeaderNeuron");
         }
         catch (Exception ex)
         {
-            context.LogError($"Critical Error in RallyOrchestrator: {ex.Message}\n{ex.StackTrace}");
+            context.LogError("RallyOrchestrator", $"Critical Error in RallyOrchestrator: {ex.Message}\n{ex.StackTrace}");
             _logger.LogError(ex, "Rally Analysis Failed");
         }
         finally
@@ -251,9 +266,51 @@ public class RallyOrchestrator
         return (result, context);
     }
 
+    /// <summary>
+    /// Lookups both the real OCR confidence and the original spatial block that provided the text.
+    /// Uses Fuzzy matching to handle slight cleanup changes.
+    /// </summary>
+    private (double Confidence, AnalyzedBlock? SourceBlock) FindBlockEvidence(string value, HashSet<AnalyzedBlock> blocks)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return (0, null);
+
+        var exact = blocks.FirstOrDefault(b => b.Raw.Text.Contains(value));
+        if (exact != null) return (exact.Raw.Confidence * 100, exact);
+
+
+        var bestFuzzy = blocks
+            .Select(b => new { Block = b, Ratio = Fuzz.PartialRatio(b.Raw.Text, value) })
+            .Where(x => x.Ratio > 85)
+            .OrderByDescending(x => x.Ratio)
+            .FirstOrDefault();
+
+        if (bestFuzzy != null) return (bestFuzzy.Block.Raw.Confidence * 100, bestFuzzy.Block);
+
+        if (long.TryParse(value, out _))
+        {
+            var numberMatch = blocks
+                .Select(b => new { Block = b, CleanText = Regex.Replace(b.Raw.Text, @"[^\d]", "") })
+                .Where(x => x.CleanText.Contains(value)) // Procura "206000" dentro de "2060002200000"
+                .OrderByDescending(x => x.Block.Raw.Confidence)
+                .FirstOrDefault();
+
+            if (numberMatch != null) return (numberMatch.Block.Raw.Confidence * 100, numberMatch.Block);
+        }
+
+        if (value == "Barbarian Fort")
+        {
+            var fortMatch = blocks
+                .Where(b => b.Raw.Text.Contains("Forte") || b.Raw.Text.Contains("Fort"))
+                .OrderByDescending(b => b.Raw.Confidence)
+                .FirstOrDefault();
+            if (fortMatch != null) return (fortMatch.Raw.Confidence * 100, fortMatch);
+        }
+
+        return (50.0, null);
+    }
+
     private void InferTroopTypes(RallyResult result, OcrAnalysisContext context)
     {
-        // Identifies the troop types actively participating in this rally
         var globalTotals = new Dictionary<string, long>
         {
             { "Infantry", result.GlobalTroops.Infantry },
@@ -263,7 +320,7 @@ public class RallyOrchestrator
         };
 
         var activeTroops = globalTotals.Where(t => t.Value > 0).ToList();
-        if (!activeTroops.Any()) return; // Aborts inference if no global troops were detected
+        if (!activeTroops.Any()) return;
 
         foreach (var p in result.Participants)
         {
@@ -271,41 +328,78 @@ public class RallyOrchestrator
             {
                 if (detail.Type != "Unknown") continue;
 
-                // INFERENCE PIPELINE 1: Single-Troop Rally Deduction
-                // If the global summary contains only one troop type, all participants implicitly sent that type.
                 if (activeTroops.Count == 1)
                 {
                     detail.Type = activeTroops.First().Key;
-                    context.Log($"Logical Inference: Set {p.Name}'s {detail.Count} troops to {detail.Type} (Single-troop rally).");
+                    context.Log("TroopInferenceEngine", $"Logical Inference: Set {p.Name}'s {detail.Count} troops to {detail.Type} (Single-troop rally).");
                     continue;
                 }
 
-                // INFERENCE PIPELINE 2: Exact Quantity Matching
-                // In mixed rallies, if a participant's sent amount perfectly matches a unique global sum, the type is deduced.
                 var exactMatch = activeTroops.Where(t => t.Value == detail.Count).ToList();
                 if (exactMatch.Count == 1)
                 {
                     detail.Type = exactMatch.First().Key;
-                    context.Log($"Logical Inference: Set {p.Name}'s {detail.Count} troops to {detail.Type} (Exact amount match).");
+                    context.Log("TroopInferenceEngine", $"Logical Inference: Set {p.Name}'s {detail.Count} troops to {detail.Type} (Exact amount match).");
                     continue;
                 }
 
-                // INFERENCE PIPELINE 3: Logical Elimination
-                // Evaluates mathematical bounds to eliminate impossible troop assignments.
                 var mathematicallyPossible = activeTroops.Where(t => t.Value >= detail.Count).ToList();
                 if (mathematicallyPossible.Count == 1)
                 {
                     detail.Type = mathematicallyPossible.First().Key;
-                    context.Log($"Logical Inference: Set {p.Name}'s {detail.Count} troops to {detail.Type} (Logical elimination).");
+                    context.Log("TroopInferenceEngine", $"Logical Inference: Set {p.Name}'s {detail.Count} troops to {detail.Type} (Logical elimination).");
                 }
             }
         }
     }
 
-    private ExtractionResult<T> CreateResult<T>(T val) => new ExtractionResult<T> { Value = val, Confidence = 100, SourceBlock = null };
-
-    private void AuditRally(RallyResult result, OcrAnalysisContext context)
+    /// <summary>
+    /// Helper to create a Result with dynamic confidence and spatial traceability.
+    /// </summary>
+    private ExtractionResult<T> CreateResult<T>(T val, string strategy, double confidence, AnalyzedBlock? sourceBlock) => new ExtractionResult<T>
     {
+        Value = val,
+        Confidence = Math.Clamp(confidence, 0, 100),
+        Strategy = strategy,
+        SourceBlock = sourceBlock
+    };
+
+    /// <summary>
+    /// Lookups the real OCR confidence from the block that provided the text.
+    /// Uses Fuzzy matching to handle slight cleanup changes (like removed brackets).
+    /// </summary>
+    private double FindBlockConfidence(string value, HashSet<AnalyzedBlock> blocks)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return 0;
+
+        // Try exact match first
+        var exact = blocks.FirstOrDefault(b => b.Raw.Text.Contains(value));
+        if (exact != null) return exact.Raw.Confidence * 100;
+
+        // Try fuzzy match
+        var bestFuzzy = blocks
+            .Select(b => new { Block = b, Ratio = Fuzz.PartialRatio(b.Raw.Text, value) })
+            .Where(x => x.Ratio > 85)
+            .OrderByDescending(x => x.Ratio)
+            .FirstOrDefault();
+
+        return bestFuzzy != null ? bestFuzzy.Block.Raw.Confidence * 100 : 50.0; // Fallback to 50% if logic found it but block is lost
+    }
+
+    private void AuditRally(RallyResult result, OcrAnalysisContext context, HashSet<AnalyzedBlock> usedBlocks)
+    {
+        // 1. Calculate the Base Confidence from the OCR data directly
+        // Average confidence of all blocks used in the process (Header + Participants + Target)
+        double baseConfidence = usedBlocks.Any() ? usedBlocks.Average(b => b.Raw.Confidence) * 100 : 0;
+
+        // If no blocks, something is wrong
+        if (baseConfidence == 0)
+        {
+            result.OverallConfidence = 0;
+            return;
+        }
+
+        // 2. Apply Business Logic Validation
         // Audits the aggregate participant troops against the header's reported capacity
         if (result.Participants.Any())
         {
@@ -319,29 +413,37 @@ public class RallyOrchestrator
 
                 if (errorRate < 0.05)
                 {
-                    result.OverallConfidence = 95;
-                    context.Log("Audit Passed: Participant sum matches Header capacity.");
+                    // Bonus for mathematical perfection (+5%)
+                    baseConfidence = Math.Min(100, baseConfidence * 1.05);
+                    context.Log("ConsistencyAuditor", "Audit Passed: Participant sum matches Header capacity.");
                 }
                 else
                 {
-                    result.OverallConfidence = Math.Max(50, 90 - (errorRate * 100));
+                    // Penalty proportional to error rate
+                    // e.g., 10% error reduces confidence by ~15%
+                    double penaltyMultiplier = 1.0 - (errorRate * 1.5);
+                    baseConfidence = Math.Max(40, baseConfidence * penaltyMultiplier);
+
                     string warning = $"Capacity Mismatch: Header says {headerCurrent}, List sums to {sumFromList} (Diff: {diff})";
                     result.Warnings.Add(warning);
-                    context.LogWarning("AUDIT_FAIL", warning);
+                    context.LogWarning("ConsistencyAuditor", "WARN_CAPACITY_MISMATCH", warning, "HIGH", "currentCapacity");
                 }
             }
             else
             {
+                // If header capacity couldn't be read, trust the list sum but apply small penalty
                 result.Status.CurrentCapacity = sumFromList;
-                result.OverallConfidence = 80;
+                baseConfidence *= 0.90;
             }
         }
         else
         {
-            // Prevents confidence penalty on MultiList screens where participants are inherently absent.
-            result.OverallConfidence = 90;
+            // MultiList screens (no participants) shouldn't be penalized if the header is clear
+            if (string.IsNullOrEmpty(result.Target.Name)) baseConfidence -= 20;
         }
 
-        if (string.IsNullOrEmpty(result.RallyId) || result.RallyId.Contains("X0Y0")) result.OverallConfidence -= 20;
+        if (string.IsNullOrEmpty(result.RallyId) || result.RallyId.Contains("X0Y0")) baseConfidence -= 15;
+
+        result.OverallConfidence = Math.Round(Math.Clamp(baseConfidence, 0, 100), 2);
     }
 }

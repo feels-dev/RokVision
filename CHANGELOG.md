@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-03-07
+
+### Added
+- **Enterprise API Standard (JSON v2.0)**: A complete overhaul of the API response structure across **ALL** endpoints (`/governor`, `/rally`, `/reports`, `/map`, `/ap`, `/xp`).
+  - **Automation-Ready Spatial Data**: Every extracted field now returns a `spatial` object containing both **Absolute** (pixel) and **Normalized** (0.0 to 1.0) coordinates. This allows developers to build overlays and automation bots that are **100% resolution-independent**.
+  - **Granular Traceability**: Fields now report their extraction `source`, detailing exactly which logic pipeline was responsible (e.g., `"detector": "IdNeuron_StrictLabel"` vs `"strategy": "Magnifier_Rescue"`).
+  - **Structured Telemetry**: Replaced flat text logs with a structured `executionTrace` object, enabling programmatic auditing of the decision-making process.
+  - **Correlation IDs**: Every request now generates and tracks a unique UUID (`correlationId`) for end-to-end debugging between the C# Orchestrator and Python Engine.
+
+- **Interactables Framework**: Added the `interactables` dictionary to the response schema. While currently populated by OCR heuristics, this structure is the **foundation for the upcoming v0.6.0**, which will fill this section with non-text UI elements (buttons, icons) detected by YOLOv8.
+
+### Changed
+- **Architectural Unification**: Refactored `ReportOrchestrator`, `RallyOrchestrator`, `MapOrchestrator`, etc to share the same rigorous context validation and error handling logic as the Governor module.
+- **Battle Report Integrity**: Fixed a critical logic gap where numerical metrics (e.g., "Total Units", "Dead") were correctly parsed but lacked spatial reference data. The system now retains 100% of the bounding box lineage for every number.
+- **Confidence Scoring**: Moved from static confidence assignment to a dynamic, weighted scoring system based on the actual OCR blocks used for each specific field.
+
+### Deprecated
+- **Legacy Response Format**: The old flat JSON structure has been replaced by the new `DataEnvelope<T>` pattern. Clients should migrate to reading `data.businessSummary` for values and `data.extractedFields` for metadata.
+
+---
+
 ## [0.5.0] - 2026-03-05
 
 ### Added

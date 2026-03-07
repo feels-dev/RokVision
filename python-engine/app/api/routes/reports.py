@@ -74,3 +74,5 @@ async def analyze_report(request: OcrRequest):
     except Exception as e:
         logger.error(f"🔥 Report Processing Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+    

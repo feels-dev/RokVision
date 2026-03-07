@@ -1,5 +1,5 @@
 using System.Text.RegularExpressions;
-using System.Linq; 
+using System.Linq;
 using RoK.Ocr.Domain.Models;
 using RoK.Ocr.Domain.Enums;
 using RoK.Ocr.Application.Common.Cognitive;
@@ -12,6 +12,7 @@ public class AllianceTagResult
     public string NameSuffix { get; set; } = "";
     public AnalyzedBlock? OriginalBlock { get; set; }
     public bool LowConfidence { get; set; }
+    public string Strategy { get; set; } = "Unknown"; // New field
 }
 
 public class AllianceTagNeuron
@@ -21,17 +22,16 @@ public class AllianceTagNeuron
         double minX = side == SideLocation.Attacker ? 0.0 : 0.5;
         double maxX = side == SideLocation.Attacker ? 0.5 : 1.0;
 
-        // Searches in the header zone
         var nodes = graph.GetNodesInRegion(minX, maxX, 0.0, 0.4);
 
-        // Looks for the best candidate that starts with [ or ends with ]
         var tagBlock = nodes
             .Where(n => n.Type != BlockType.UI)
             .Where(n => n.Raw.Text.Contains("[") || n.Raw.Text.Contains("]"))
+            .Where(n => !(side == SideLocation.Attacker && n.NormalizedCenter.X > 0.35 && n.NormalizedCenter.Y < 0.22))
             .OrderByDescending(n => n.Raw.Confidence)
             .FirstOrDefault();
 
-        if (tagBlock == null) return new AllianceTagResult();
+        if (tagBlock == null) return new AllianceTagResult { Strategy = "Tag_NotFound" };
 
         return ParseRigid(tagBlock);
     }
@@ -41,25 +41,27 @@ public class AllianceTagNeuron
         string text = block.Raw.Text.Trim();
         var result = new AllianceTagResult { OriginalBlock = block };
 
-        // More permissive Regex: accepts almost anything inside brackets [ ]
+        // Case A: [TAG] Name
         var matchA = Regex.Match(text, @"^\[(?<tag>[^\]]{2,6})\](?<name>.*)");
         if (matchA.Success)
         {
             result.Tag = matchA.Groups["tag"].Value;
             result.NameSuffix = matchA.Groups["name"].Value;
+            result.Strategy = "Tag_Regex_Brackets";
             return result;
         }
 
-        // Case B: AAAA]Name (Lost the initial bracket)
+        // Case B: TAG]Name
         var matchB = Regex.Match(text, @"^(?<tag>.{3,5})\](?<name>.*)");
         if (matchB.Success)
         {
             result.Tag = matchB.Groups["tag"].Value;
             result.NameSuffix = matchB.Groups["name"].Value;
+            result.Strategy = "Tag_Regex_PartialBracket";
             return result;
         }
 
-        // Case C: [AAAANOME (Stuck together and no closing bracket)
+        // Case C: [TAGNAME
         if (text.StartsWith("["))
         {
             string content = text.Substring(1);
@@ -68,13 +70,15 @@ public class AllianceTagNeuron
                 result.Tag = content.Substring(0, 4);
                 result.NameSuffix = content.Substring(4);
                 result.LowConfidence = true;
+                result.Strategy = "Tag_Heuristic_StartBracket";
                 return result;
             }
         }
 
-        // Case D: Pure Text that OCR classified as Tag
+        // Case D: Pure Text
         result.Tag = text.Replace("[", "").Replace("]", "").Trim();
         if (result.Tag.Length > 5) result.Tag = result.Tag.Substring(0, 5);
+        result.Strategy = "Tag_PureTextFallback";
 
         return result;
     }

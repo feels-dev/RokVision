@@ -7,19 +7,25 @@ using RoK.Ocr.Domain.Models;
 
 namespace RoK.Ocr.Application.Common.Models;
 
+/// <summary>
+/// Context object that travels through the entire OCR and YOLO analysis pipeline,
+/// collecting evidence, telemetry, traces, and metrics.
+/// </summary>
 public class OcrAnalysisContext
 {
-    // --- Existing Properties ---
-    public List<string> AuditLog { get; } = new();
-    public Dictionary<string, FieldEvidenceDto> Evidence { get; } = new();
+    // --- CORE DATA ---
+    public ExecutionTraceDto ExecutionTrace { get; } = new();
+    public Dictionary<string, FieldEvidenceDto> ExtractedFields { get; } = new();
+    public Dictionary<string, InteractableElementDto> Interactables { get; } = new();
     public List<SystemWarning> Warnings { get; } = new();
     public DateTime StartTime { get; } = DateTime.UtcNow;
 
-    // --- DEBUG EXTENSIONS ---
-    // Structure to accumulate data
-    public DebugInformationDto DebugInfo { get; } = new();
+    // --- IMAGE CONTEXT (Required for Normalized Coordinates) ---
+    public int ImageWidth { get; set; }
+    public int ImageHeight { get; set; }
 
-    // Private dictionary for active timers
+    // --- DEBUG EXTENSIONS ---
+    public DebugInformationDto DebugInfo { get; } = new();
     private readonly Dictionary<string, Stopwatch> _activeTimers = new();
 
     // --- TIMING METHODS ---
@@ -35,22 +41,130 @@ public class OcrAnalysisContext
         {
             var sw = _activeTimers[key];
             sw.Stop();
-            // Accumulate if already exists (for loops)
             if (DebugInfo.Timings.ContainsKey(key))
                 DebugInfo.Timings[key] += sw.Elapsed.TotalMilliseconds;
             else
                 DebugInfo.Timings[key] = sw.Elapsed.TotalMilliseconds;
-            
+
             _activeTimers.Remove(key);
         }
     }
 
-    // --- REGISTRATION METHODS ---
-    
+    // --- TRACING METHODS (Replacing flat string AuditLog) ---
+    public void AddTrace(string level, string component, string message)
+    {
+        ExecutionTrace.Steps.Add(new ExecutionStepDto
+        {
+            Timestamp = DateTime.UtcNow,
+            Level = level,
+            Component = component,
+            Message = message
+        });
+    }
+
+    public void Log(string component, string message) => AddTrace("INFO", component, message);
+
+    public void LogWarning(string component, string code, string message, string severity = "MEDIUM", string? field = null)
+    {
+        AddTrace("WARN", component, $"{code}: {message}");
+        Warnings.Add(new SystemWarning(code, message, severity, field));
+    }
+
+    public void LogError(string component, string message) => AddTrace("ERROR", component, message);
+
+    // --- RESULT REGISTRATION METHODS ---
+    public void RegisterResult<T>(string fieldKey, ExtractionResult<T> result, string detectorComponent, string readerComponent = "PaddleOCR_v4", bool isCorrection = false)
+    {
+        var evidence = new FieldEvidenceDto
+        {
+            Value = result.Value,
+            RawText = result.SourceBlock?.Raw.Text ?? string.Empty,
+            Confidence = Math.Clamp(Math.Round(result.Confidence, 2), 0, 100),
+            IsCorrection = isCorrection,
+            Source = new ExtractionSourceDto { Detector = detectorComponent, Reader = readerComponent },
+            Spatial = CreateSpatialContext(result.SourceBlock)
+        };
+
+        if (ExtractedFields.ContainsKey(fieldKey))
+        {
+            Log("Context", $"Overwriting field '{fieldKey}'. Conf: {ExtractedFields[fieldKey].Confidence} -> {evidence.Confidence}");
+            ExtractedFields[fieldKey] = evidence;
+        }
+        else
+        {
+            ExtractedFields.Add(fieldKey, evidence);
+        }
+        Log("Context", $"Field '{fieldKey}' set to '{result.Value}' via {detectorComponent}");
+    }
+
+    public void RegisterInteractable(string elementKey, double confidence, string detectorComponent, AnalyzedBlock block)
+    {
+        var interactable = new InteractableElementDto
+        {
+            Confidence = Math.Clamp(Math.Round(confidence, 2), 0, 100),
+            Source = detectorComponent,
+            Spatial = CreateSpatialContext(block)
+        };
+
+        Interactables[elementKey] = interactable;
+        Log("Context", $"Interactable UI Element '{elementKey}' registered via {detectorComponent}");
+    }
+
+    private SpatialContextDto CreateSpatialContext(AnalyzedBlock? block)
+    {
+        var spatial = new SpatialContextDto();
+        if (block == null) return spatial;
+
+        try
+        {
+            var rawBox = block.Raw.Box;
+            int x = (int)rawBox[0][0];
+            int y = (int)rawBox[0][1];
+            int w = (int)(rawBox[1][0] - rawBox[0][0]);
+            int h = (int)(rawBox[2][1] - rawBox[1][1]);
+
+            spatial.Absolute = new AbsoluteSpatialDto
+            {
+                Box = new AbsoluteBoundingBoxDto { X = x, Y = y, Width = w, Height = h },
+                Center = new AbsolutePointDto { X = x + (w / 2), Y = y + (h / 2) }
+            };
+
+            if (ImageWidth > 0 && ImageHeight > 0)
+            {
+                spatial.Normalized = new NormalizedSpatialDto
+                {
+                    Box = new NormalizedBoundingBoxDto
+                    {
+                        NormalizedX = Math.Round((double)x / ImageWidth, 4),
+                        NormalizedY = Math.Round((double)y / ImageHeight, 4),
+                        NormalizedWidth = Math.Round((double)w / ImageWidth, 4),
+                        NormalizedHeight = Math.Round((double)h / ImageHeight, 4)
+                    },
+                    Center = new NormalizedPointDto
+                    {
+                        NormalizedX = Math.Round((double)spatial.Absolute.Center.X / ImageWidth, 4),
+                        NormalizedY = Math.Round((double)spatial.Absolute.Center.Y / ImageHeight, 4)
+                    }
+                };
+            }
+        }
+        catch { /* Ignore invalid box arrays */ }
+
+        return spatial;
+    }
+
+    public double GetTotalProcessingTimeMs()
+    {
+        if (DebugInfo.Timings.TryGetValue("TotalOrchestration", out double val))
+            return val;
+
+        return (DateTime.UtcNow - StartTime).TotalMilliseconds;
+    }
+
+    // --- DEBUG REGISTRATION ---
     public void RegisterAnchors(IEnumerable<string> keys)
     {
-        if (keys != null)
-            DebugInfo.AnchorsFound.AddRange(keys);
+        if (keys != null) DebugInfo.AnchorsFound.AddRange(keys);
     }
 
     public void RegisterMagnifierAttempt(string field, int tries, string? winner, bool success)
@@ -62,62 +176,5 @@ public class OcrAnalysisContext
             WinningStrategy = winner ?? "None",
             Success = success
         });
-    }
-
-    // --- Original Methods (Log, RegisterResult) ---
-    public void Log(string message) => AuditLog.Add($"[INFO] {message}");
-
-    public void LogWarning(string code, string message, string? field = null)
-    {
-        AuditLog.Add($"[WARN] {code}: {message}");
-        Warnings.Add(new SystemWarning(code, message, field));
-    }
-
-    public void LogError(string message) => AuditLog.Add($"[ERROR] {message}");
-
-    public void RegisterResult<T>(string fieldKey, ExtractionResult<T> result, string strategyName)
-    {
-        var evidence = new FieldEvidenceDto
-        {
-            Value = result.Value?.ToString() ?? string.Empty,
-            Confidence = Math.Clamp(Math.Round(result.Confidence, 2), 0, 100), 
-            Method = strategyName,
-            Raw = result.SourceBlock?.Raw.Text ?? string.Empty,
-            Box = ExtractBoundingBox(result.SourceBlock)
-        };
-
-        if (Evidence.ContainsKey(fieldKey))
-        {
-            Log($"Overwriting field '{fieldKey}'. Conf: {Evidence[fieldKey].Confidence} -> {evidence.Confidence}");
-            Evidence[fieldKey] = evidence;
-        }
-        else
-        {
-            Evidence.Add(fieldKey, evidence);
-        }
-        Log($"Field '{fieldKey}' set to '{result.Value}' via {strategyName}");
-    }
-
-    private List<int>? ExtractBoundingBox(AnalyzedBlock? block)
-    {
-        if (block == null) return null;
-        try
-        {
-            var rawBox = block.Raw.Box;
-            int x = (int)rawBox[0][0];
-            int y = (int)rawBox[0][1];
-            int w = (int)(rawBox[1][0] - rawBox[0][0]);
-            int h = (int)(rawBox[2][1] - rawBox[1][1]);
-            return new List<int> { x, y, w, h };
-        }
-        catch { return null; }
-    }
-
-    public double GetTotalProcessingTime()
-    {
-        if (DebugInfo.Timings.TryGetValue("TotalOrchestration", out double val))
-            return val / 1000.0; // Converte ms para segundos
-            
-        return (DateTime.UtcNow - StartTime).TotalSeconds;
     }
 }

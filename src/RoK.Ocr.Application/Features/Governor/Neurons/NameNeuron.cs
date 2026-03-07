@@ -20,7 +20,7 @@ public class NameNeuron : IOcrNeuron<string>
     {
         // The ID anchor is mandatory to define the search context
         if (!anchors.ContainsKey("ID"))
-            return new ExtractionResult<string> { Value = "--", Confidence = 0 };
+            return new ExtractionResult<string> { Value = "--", Confidence = 0, Strategy = "Name_NoAnchor" };
 
         var idAnchor = anchors["ID"];
 
@@ -47,11 +47,12 @@ public class NameNeuron : IOcrNeuron<string>
             {
                 Value = CleanName(winner.Block.Raw.Text),
                 Confidence = winner.Score,
+                Strategy = "Name_SpatialScore",
                 SourceBlock = winner.Block
             };
         }
 
-        return new ExtractionResult<string> { Value = "--", Confidence = 0 };
+        return new ExtractionResult<string> { Value = "--", Confidence = 0, Strategy = "Name_NotFound" };
     }
 
     /// <summary>
@@ -63,91 +64,48 @@ public class NameNeuron : IOcrNeuron<string>
         var raw = candidate.Raw;
 
         // --- 1. CORE FILTERS (Immediate Elimination) ---
+        if (IsUiKeyword(text)) return -999;
+        if (text.Length < 3) return -999;
+        if (Regex.IsMatch(text, @"^\d+[\.,]?\d*$")) return -999;
 
-        // UI Filter: Ignore if the text matches game labels (e.g., "Civilization", "Power")
-        if (IsUiKeyword(text))
-            return -999;
-
-        // Length Filter: Valid names in RoK are at least 3 characters long
-        if (text.Length < 3)
-            return -999;
-
-        // Numeric Filter: Governor names are rarely pure numbers (usually Power or Kill Points)
-        if (Regex.IsMatch(text, @"^\d+[\.,]?\d*$"))
-            return -999;
-
-        // Duplicate Filter: Prevent picking up the ID digits again as the name
         string cleanId = Regex.Replace(idAnchor.Raw.Text, @"[^\d]", "");
-        if (!string.IsNullOrEmpty(cleanId) && text.Contains(cleanId))
-            return -999;
+        if (!string.IsNullOrEmpty(cleanId) && text.Contains(cleanId)) return -999;
 
         double score = 100.0;
 
         // --- 2. GEOMETRIC ANALYSIS (Relative Positioning) ---
-
-        // Calculate vertical and horizontal distances from the ID anchor
         double diffY = raw.Center.Y - idAnchor.Center.Y;
         double diffX = Math.Abs(raw.Center.X - idAnchor.Center.X);
 
-        // Name is typically located just below the "Governor (ID: ...)" label
-        if (diffY < -25)
-            return -999; // Above the anchor (likely HUD Power/Resources)
-
-        if (diffY > 180)
-            return -999; // Too far below (likely Alliance name or lower menu items)
-
-        if (diffX > 400)
-            score -= 60; // Too far horizontally from the profile center
+        if (diffY < -25) return -999;
+        if (diffY > 180) return -999;
+        if (diffX > 400) score -= 60;
 
         // --- 3. SEMANTIC BONUSES AND PENALTIES ---
+        if (text.Contains("[") || text.Contains("]")) score += 50;
 
-        // Alliance Tag Bonus: Common for names to be attached to brackets (e.g., [TAG]Name)
-        if (text.Contains("[") || text.Contains("]"))
-        {
-            score += 50;
-        }
+        if (diffY > 20 && diffY < 80 && diffX < 150) score += 40;
 
-        // "Golden Zone" Bonus: Blocks located 20-80px below the ID and horizontally aligned
-        if (diffY > 20 && diffY < 80 && diffX < 150)
-        {
-            score += 40;
-        }
-
-        // Status Bar Penalty: Avoid picking up text near AP/XP bars (e.g., "792/1.500")
         bool hasStatusBarNearby = allBlocks.Any(other =>
             other.Type == BlockType.BarStatus &&
             Math.Abs(other.Center.Y - candidate.Center.Y) < 40
         );
 
-        if (hasStatusBarNearby)
-        {
-            score -= 50;
-        }
+        if (hasStatusBarNearby) score -= 50;
 
-        // Noise Penalty: Excessive special characters usually indicate OCR garbage
         int specialChars = text.Count(c => !char.IsLetterOrDigit(c) && c != '[' && c != ']' && c != ' ');
-        if (specialChars > 3)
-        {
-            score -= 30;
-        }
+        if (specialChars > 3) score -= 30;
 
         // --- 4. OCR CONFIDENCE ---
-        // Incorporate PaddleOCR confidence (0.0 to 1.0) into the final score
         score += (candidate.Raw.Confidence * 20);
 
         return score;
     }
 
-    /// <summary>
-    /// Checks if the text corresponds to a known game UI element.
-    /// </summary>
     private bool IsUiKeyword(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return true;
-
         string cleanText = text.Replace(":", "").Replace(".", "").Trim();
-
-        // Combine all vocabulary lists for comprehensive filtering
         var allKeys = RokVocabulary.UiKeywords
             .Concat(RokVocabulary.StatusLabels)
             .Concat(RokVocabulary.GovernorLabels)
@@ -156,13 +114,8 @@ public class NameNeuron : IOcrNeuron<string>
 
         foreach (var key in allKeys)
         {
-            // Direct match
-            if (cleanText.Contains(key, StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            // Fuzzy match to handle OCR typos (e.g., "Civilizagao" instead of "Civilização")
-            if (RokCognitiveTools.CalculateSimilarity(cleanText, key) > 0.75)
-                return true;
+            if (cleanText.Contains(key, StringComparison.OrdinalIgnoreCase)) return true;
+            if (RokCognitiveTools.CalculateSimilarity(cleanText, key) > 0.75) return true;
         }
         return false;
     }
