@@ -1,24 +1,22 @@
 using System;
 using RoK.Ocr.Domain.Models.Reports;
-using RoK.Ocr.Domain.Enums;
+using RoK.Ocr.Application.Common.Models;
 
 namespace RoK.Ocr.Application.Features.Reports.Services;
 
 public static class ConsistencyAuditor
 {
-    public static void Audit(ReportResult report)
+    public static void Audit(ReportResult report, OcrAnalysisContext context)
     {
-        // 1. Audit the Attacker
-        AuditSide(report.Attacker, "Attacker", report);
+        AuditSide(report.Attacker, "Attacker", context, "atk");
 
-        // 2. Audit the Defender (only if it is PVP)
-        if (report.Type != ReportType.Barbarian)
+        if (report.Type != Domain.Enums.ReportType.Barbarian)
         {
-            AuditSide(report.Defender, "Defender", report);
+            AuditSide(report.Defender, "Defender", context, "def");
         }
     }
 
-    private static void AuditSide(BattleSide side, string sideName, ReportResult report)
+    private static void AuditSide(BattleSide side, string sideName, OcrAnalysisContext context, string prefix)
     {
         if (side.TotalUnits <= 0) return;
 
@@ -28,7 +26,13 @@ public static class ConsistencyAuditor
         if (expected != actual)
         {
             long diff = Math.Abs(expected - actual);
-            report.Warnings.Add($"[Math Mismatch] {sideName}: Difference of {diff} units.");
+            context.LogWarning(
+                "ConsistencyAuditor", 
+                "WARN_MATH_MISMATCH", 
+                $"[{sideName}] Math mismatch: Expected {expected} vs Actual {actual} (Diff: {diff})", 
+                "HIGH", 
+                $"{prefix}_total_units"
+            );
         }
     }
 }

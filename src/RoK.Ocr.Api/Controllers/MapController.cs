@@ -24,45 +24,45 @@ public class MapController : ControllerBase
     [ProducesResponseType(typeof(RokResponse<MapAnalysisResult>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Analyze([FromForm] MapUploadRequest request)
     {
-        // 1. Start Global Timer
         var swGlobal = Stopwatch.StartNew();
+        string correlationId = Guid.NewGuid().ToString();
 
         if (request.Image == null || request.Image.Length == 0)
-            return BadRequest(ResponseFactory.CreateFailure<MapAnalysisResult>("No image sent.", "ERR_NO_IMAGE", 400));
+            return BadRequest(ResponseFactory.CreateFailure<MapAnalysisResult>("No image sent.", "ERR_NO_IMAGE", 400, correlationId));
 
         try
         {
-            // 2. Orchestration
-            // The orchestrator handles file saving and logic
             var (result, context) = await _orchestrator.AnalyzeAsync(request.Image.OpenReadStream(), request.Image.FileName);
 
             swGlobal.Stop();
 
-            // 3. Construct Response
-            // Calculate overall confidence based on evidence found (coordinates + batch confidence average)
-            double overallConfidence = 90.0; // Default high for map logic
-            if (context.Evidence.Any())
+            double overallConfidence = 90.0; 
+            if (context.ExtractedFields.Any())
             {
-                overallConfidence = context.Evidence.Values.Average(e => e.Confidence);
+                overallConfidence = context.ExtractedFields.Values.Average(e => e.Confidence);
             }
 
+            var imageContext = new ImageContextDto
+            {
+                OriginalWidth = context.ImageWidth > 0 ? context.ImageWidth : 1920,
+                OriginalHeight = context.ImageHeight > 0 ? context.ImageHeight : 1080,
+                ResizedScale = 1.0
+            };
+
             var response = ResponseFactory.CreateSuccess(
-                summary: result,
-                fields: context.Evidence,
-                auditLog: context.AuditLog,
-                processingTime: swGlobal.Elapsed.TotalSeconds,
-                overallConfidence: overallConfidence, 
-                warnings: context.Warnings
+                businessSummary: result,
+                context: context,
+                correlationId: correlationId,
+                imageContext: imageContext
             );
 
-            // 4. Attach Debug Info if requested
             if (request.Debug)
             {
                 response.Debug = context.DebugInfo;
+                context.DebugInfo.Timings["TotalGlobalController"] = swGlobal.Elapsed.TotalMilliseconds;
             }
             else
             {
-                // Ensure clear JSON output for production
                 response.Debug = null;
             }
 
@@ -71,7 +71,7 @@ public class MapController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Critical Error in MapController");
-            return StatusCode(500, ResponseFactory.CreateFailure<MapAnalysisResult>($"Internal error: {ex.Message}"));
+            return StatusCode(500, ResponseFactory.CreateFailure<MapAnalysisResult>($"Internal error: {ex.Message}", "ERR_INTERNAL", 500, correlationId));
         }
     }
 }

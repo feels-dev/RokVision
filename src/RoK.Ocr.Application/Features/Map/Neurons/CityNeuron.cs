@@ -6,6 +6,14 @@ using RoK.Ocr.Domain.Constants;
 namespace RoK.Ocr.Application.Features.Map.Neurons;
 
 /// <summary>
+/// Result object containing the extracted City Name, Alliance Tag, and Validation Status.
+/// </summary>
+public record CityParseResult(string Name, string AllianceTag, string RejectReason)
+{
+    public bool IsValid => Name != "--INVALID--";
+}
+
+/// <summary>
 /// Neuron specialized in parsing City Names and Alliance Tags from OCR text blocks.
 /// Uses heuristics based on common patterns observed in the game UI.
 /// </summary>
@@ -13,28 +21,28 @@ public class CityNeuron
 {
     /// <summary>
     /// Parses the raw text into a City Name and Alliance Tag.
-    /// Returns a RejectReason if the text is deemed invalid.
+    /// Returns a CityParseResult containing the validation state.
     /// </summary>
-    public (string Name, string AllianceTag, string RejectReason) Parse(string rawText, bool hasShield)
+    public CityParseResult Parse(string rawText, bool hasShield)
     {
         if (string.IsNullOrWhiteSpace(rawText) || rawText.Length < 2)
-            return ("--INVALID--", "", "EMPTY_OR_TOO_SHORT");
+            return new CityParseResult("--INVALID--", "", "EMPTY_OR_TOO_SHORT");
 
         // STEP 1: PRE-PROCESSING SANITIZATION
         string text = SanitizeInput(rawText);
 
         // STEP 2: NOISE FILTERS
         if (IsEventTimerOrNoise(text))
-            return ("--INVALID--", "", "MATCHED_TIMER_PATTERN");
+            return new CityParseResult("--INVALID--", "", "MATCHED_TIMER_PATTERN");
 
         if (text.All(char.IsDigit))
-            return ("--INVALID--", "", "ONLY_DIGITS");
+            return new CityParseResult("--INVALID--", "", "ONLY_DIGITS");
 
         // Calculate letter density to avoid reading random map textures as text
         int validChars = text.Count(c => char.IsLetterOrDigit(c) || c == ' ' || c == '[' || c == ']');
         double letterRatio = (double)validChars / (double)text.Length;
         if (letterRatio < 0.6)
-            return ("--INVALID--", "", $"LOW_LETTER_RATIO_{Math.Round(letterRatio, 2)}");
+            return new CityParseResult("--INVALID--", "", $"LOW_LETTER_RATIO_{Math.Round(letterRatio, 2)}");
 
         // STEP 3: TAG EXTRACTION LOGIC
         string tag = "";
@@ -99,13 +107,13 @@ public class CityNeuron
         {
             string? matchedBlocklistWord = GetUiNoiseMatch(name);
             if (!string.IsNullOrEmpty(matchedBlocklistWord))
-                return ("--INVALID--", "", $"BLOCKED_BY_VOCABULARY_MATCH: '{matchedBlocklistWord}'");
+                return new CityParseResult("--INVALID--", "", $"BLOCKED_BY_VOCABULARY_MATCH: '{matchedBlocklistWord}'");
         }
 
         if (name.Length < 2)
-            return ("--INVALID--", "", "NAME_TOO_SHORT_AFTER_CLEANUP");
+            return new CityParseResult("--INVALID--", "", "NAME_TOO_SHORT_AFTER_CLEANUP");
 
-        return (name, tag, "SUCCESS");
+        return new CityParseResult(name, tag, "SUCCESS");
     }
 
     private string CleanTag(string tag)
@@ -119,7 +127,7 @@ public class CityNeuron
     private string SanitizeInput(string text)
     {
         text = text.Trim();
-        // Fix common bracket OCR errors: 1 -> [, ] -> I, etc.
+        // Fix common bracket OCR errors: 1 ->[, ] -> I, etc.
         text = Regex.Replace(text, @"(\[[A-Za-z0-9]{4,5})([1Il])", "$1]");
         // Remove special characters that are not part of names
         text = Regex.Replace(text, @"[^a-zA-Z0-9\p{L}\[\]\s]", "");

@@ -8,8 +8,6 @@ using RoK.Ocr.Domain.Enums;
 using RoK.Ocr.Domain.Models;
 
 namespace RoK.Ocr.Application.Features.Reports.Cognitive;
-
-// Classe partial para suportar GeneratedRegex
 public static partial class WarBlockClassifier
 {
 
@@ -89,7 +87,6 @@ public static partial class WarBlockClassifier
         {
             if (text.Contains(v, StringComparison.OrdinalIgnoreCase)) return true;
             
-            // Otimização: Só faz split e fuzzy se não achou direto
             if (RokCognitiveTools.CalculateSimilarity(text, v) > 0.85) return true;
         }
         return false;
@@ -97,7 +94,6 @@ public static partial class WarBlockClassifier
 
     private static bool IsPureNumeric(string text)
     {
-        // Limpeza leve manual antes do regex
         string clean = text.Replace(".", "").Replace(",", "").Replace(" ", "").Replace("+", "").Trim();
         return PureNumberRegex().IsMatch(clean);
     }

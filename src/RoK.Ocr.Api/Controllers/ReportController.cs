@@ -32,9 +32,10 @@ public class ReportController : ControllerBase
     public async Task<IActionResult> Analyze([FromForm] ReportUploadRequest request)
     {
         var swGlobal = Stopwatch.StartNew();
+        string correlationId = Guid.NewGuid().ToString();
 
         if (request.Image == null || request.Image.Length == 0)
-            return BadRequest(ResponseFactory.CreateFailure<ReportResult>("No image selected.", "ERR_NO_IMAGE", 400));
+            return BadRequest(ResponseFactory.CreateFailure<ReportResult>("No image selected.", "ERR_NO_IMAGE", 400, correlationId));
 
         string physicalPath = string.Empty;
 
@@ -53,21 +54,25 @@ public class ReportController : ControllerBase
             swGlobal.Stop();
 
             // 3. Build Rich Response
+            var imageContext = new ImageContextDto
+            {
+                OriginalWidth = context.ImageWidth,
+                OriginalHeight = context.ImageHeight,
+                ResizedScale = 1.0 // Python handles resizing for reports
+            };
+
             var response = ResponseFactory.CreateSuccess(
-                summary: data,
-                fields: context.Evidence,
-                auditLog: context.AuditLog,
-                processingTime: swGlobal.Elapsed.TotalSeconds,
-                overallConfidence: data.OverallConfidence,
-                warnings: context.Warnings
+                businessSummary: data,
+                context: context,
+                correlationId: correlationId,
+                imageContext: imageContext
             );
 
             // 4. Populate Debug if requested
             if (request.Debug)
             {
-                // Basic image info (For reports, Python returns the processed canvas size, 
-                // which the orchestrator puts in the context)
                 response.Debug = context.DebugInfo;
+                context.DebugInfo.Timings["TotalGlobalController"] = swGlobal.Elapsed.TotalMilliseconds;
             }
             else
             {
@@ -79,7 +84,7 @@ public class ReportController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "[ReportController] CRITICAL ERROR: {Message}", ex.Message);
-            return StatusCode(500, ResponseFactory.CreateFailure<ReportResult>($"Internal server error: {ex.Message}"));
+            return StatusCode(500, ResponseFactory.CreateFailure<ReportResult>($"Internal server error: {ex.Message}", "ERR_INTERNAL", 500, correlationId));
         }
     }
 }

@@ -16,7 +16,7 @@ detector = YoloDetector(model_path=MODEL_PATH, confidence_thresh=0.10)
 @router.post("/detect", summary="Detects objects on the RoK map")
 async def detect_map_objects(image: UploadFile = File(...)):
     if not image.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="O arquivo enviado não é uma imagem.")
+        raise HTTPException(status_code=400, detail="The file you sent is not an image..")
 
     file_path = ""
     try:
@@ -31,7 +31,7 @@ async def detect_map_objects(image: UploadFile = File(...)):
         }
 
     except Exception as e:
-        print(f"Erro no Python Map Detect: {str(e)}")
+        print(f"[MapRoute] Error in Python Map Detect: {str(e)}")
         return {"success": False, "detections": [], "error": str(e)}
         
     finally:

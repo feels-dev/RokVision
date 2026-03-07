@@ -11,7 +11,7 @@ public partial class ApBarNeuron
     [GeneratedRegex(@"(\d[\d,\.]*)\s*\/\s*(\d[\d,\.]*)", RegexOptions.Compiled)]
     private static partial Regex BarRegex();
 
-    public (int Current, int Max) Extract(List<AnalyzedBlock> nodes)
+    public (int Current, int Max, AnalyzedBlock? SourceBlock) Extract(List<AnalyzedBlock> nodes)
     {
         // Scans the top 10 blocks (lowest Y value) to avoid scanning the whole list
         var topNodes = nodes.OrderBy(n => n.Raw.Box[0][1]).Take(10);
@@ -27,12 +27,12 @@ public partial class ApBarNeuron
                 int max = ParseInt(match.Groups[2].Value);
 
                 // Sanity check: Max must be greater than 0
-                if (max > 0) return (current, max);
+                if (max > 0) return (current, max, node);
             }
         }
-        return (0, 0);
+        return (0, 0, null);
     }
 
-    private int ParseInt(string val) 
+    private int ParseInt(string val)
         => int.TryParse(val.Replace(".", "").Replace(",", ""), out int res) ? res : 0;
 }

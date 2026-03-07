@@ -10,8 +10,8 @@ using RoK.Ocr.Application.Features.Experience.Neurons;
 using RoK.Ocr.Application.Features.Experience.Services;
 using RoK.Ocr.Domain.Interfaces;
 using RoK.Ocr.Domain.Models.Experience;
-using RoK.Ocr.Application.Common.Models; 
-using RoK.Ocr.Domain.Models; 
+using RoK.Ocr.Application.Common.Models;
+using RoK.Ocr.Domain.Models;
 
 namespace RoK.Ocr.Application.Features.Experience.Orchestrator;
 
@@ -39,7 +39,7 @@ public class XpOrchestrator
     {
         var finalData = new XpInventoryData();
         var itemTracker = new Dictionary<string, XpItemEntry>();
-        var context = new OcrAnalysisContext(); 
+        var context = new OcrAnalysisContext();
         context.StartTimer("TotalOrchestration");
 
         context.Log("XpOrchestrator", $"Starting XP inventory analysis for {images.Count} images.");
@@ -49,7 +49,7 @@ public class XpOrchestrator
         foreach (var image in images)
         {
             imgIndex++;
-            context.StartTimer($"Image_{imgIndex}_Total"); 
+            context.StartTimer($"Image_{imgIndex}_Total");
 
             string tempPath = "";
             try
@@ -76,13 +76,13 @@ public class XpOrchestrator
                 }
 
                 context.Log("XpOrchestrator", $"[IMG {imgIndex}] OCR Scan Complete. Found {rawBlocks?.Count ?? 0} blocks.");
-                
+
                 // Log RawText in Debug
                 if (debugMode && fullText.Length > 0)
                 {
                     context.DebugInfo.RawText += $"--- IMG {imgIndex} ---\n{fullText}\n";
                 }
-                
+
                 if (rawBlocks == null || !rawBlocks.Any()) continue;
 
                 // 2. Initial Extraction
@@ -92,11 +92,16 @@ public class XpOrchestrator
                 context.Log("XpOrchestrator", $"[IMG {imgIndex}] Initial extraction found {itemsFound.Count} potential items.");
 
                 // 3. KEY STEP: Call the Magnifier (Sniper Mode)
-                await _magnifier.ResolveMissingQuantitiesAsync(tempPath, itemsFound, context); 
+                if (itemsFound.Any(i => i.Quantity == -1))
+                {
+                    context.ExecutionTrace.MagnifierUsed = true;
+                }
+
+                await _magnifier.ResolveMissingQuantitiesAsync(tempPath, itemsFound, context);
 
                 // --- SANITY CHECK & Merge Logic ---
                 int recoveredCount = 0;
-                
+
                 foreach (var item in itemsFound)
                 {
                     string fieldKey = $"xp_{item.ItemId}";
@@ -117,43 +122,43 @@ public class XpOrchestrator
                         context.LogWarning("ConsistencyAuditor", "WARN_QUANTITY_MISSING", $"Could not read quantity for {item.ItemId} (Color: {item.DetectedColor}).", "MEDIUM", fieldKey);
                         continue;
                     }
-                    
+
                     if (item.Confidence > 0)
                     {
-                        recoveredCount++; 
+                        recoveredCount++;
 
                         if (itemTracker.TryGetValue(item.ItemId, out var existing))
                         {
                             if (existing.Quantity != item.Quantity)
                             {
-                                bool useNew = item.Quantity > existing.Quantity; 
+                                bool useNew = item.Quantity > existing.Quantity;
                                 context.LogWarning("ConsistencyAuditor", "WARN_ITEM_CONFLICT", $"Item '{item.ItemId}' conflict. Values: {existing.Quantity} vs {item.Quantity}. Using {(useNew ? item.Quantity : existing.Quantity)}.", "MEDIUM", fieldKey);
 
-                                if (useNew) 
-                                { 
-                                    itemTracker[item.ItemId] = item; 
-                                    context.RegisterResult(fieldKey, CreateExtractionResult(item), "XpItemNeuron_Conflict_New"); 
+                                if (useNew)
+                                {
+                                    itemTracker[item.ItemId] = item;
+                                    context.RegisterResult(fieldKey, CreateExtractionResult(item), "XpItemNeuron_Conflict_New", isCorrection: true);
                                 }
                             }
                             else if (item.Confidence > existing.Confidence)
                             {
-                                itemTracker[item.ItemId] = item; 
-                                context.RegisterResult(fieldKey, CreateExtractionResult(item), "XpItemNeuron_Confidence_Update");
+                                itemTracker[item.ItemId] = item;
+                                context.RegisterResult(fieldKey, CreateExtractionResult(item), "XpItemNeuron_Confidence_Update", isCorrection: true);
                             }
                         }
                         else
                         {
-                            itemTracker.Add(item.ItemId, item); 
-                            context.RegisterResult(fieldKey, CreateExtractionResult(item), item.Strategy ?? "XpItemNeuron_Direct");
+                            itemTracker.Add(item.ItemId, item);
+                            context.RegisterResult(fieldKey, CreateExtractionResult(item), item.Strategy ?? "XpItemNeuron_Direct", isCorrection: true);
                         }
                     }
                 }
-                
+
                 if (debugMode)
                 {
                     context.RegisterMagnifierAttempt($"Image {imgIndex} XP Resolution", 1, $"Recovered {recoveredCount} items", recoveredCount > 0);
                 }
-                
+
                 context.StopTimer($"Image_{imgIndex}_Logic");
             }
             catch (Exception ex)
@@ -163,7 +168,7 @@ public class XpOrchestrator
             }
             finally
             {
-                if (!string.IsNullOrEmpty(tempPath) && File.Exists(tempPath)) 
+                if (!string.IsNullOrEmpty(tempPath) && File.Exists(tempPath))
                 {
                     try { File.Delete(tempPath); } catch { }
                 }
@@ -171,10 +176,10 @@ public class XpOrchestrator
             }
         }
 
-        finalData.Items = itemTracker.Values.OrderByDescending(i => i.Confidence).ToList(); 
+        finalData.Items = itemTracker.Values.OrderByDescending(i => i.Confidence).ToList();
 
         context.StopTimer("TotalOrchestration");
-        
+
         return (finalData, context);
     }
 

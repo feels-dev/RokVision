@@ -266,7 +266,7 @@ public class MapMagnifier
         }
         catch (Exception ex)
         {
-            context.LogWarning("MAGNIFIER_ERROR", $"Zoom failed: {ex.Message}");
+            context.LogWarning("MapMagnifier", "MAGNIFIER_ERROR", $"Zoom failed: {ex.Message}", "LOW");
             context.StopTimer("Magnifier_Zoom");
             return null;
         }

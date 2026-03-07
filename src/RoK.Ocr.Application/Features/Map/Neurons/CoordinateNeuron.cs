@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -8,52 +9,74 @@ namespace RoK.Ocr.Application.Features.Map.Neurons;
 
 /// <summary>
 /// Neuron responsible for extracting Kingdom Number and X/Y Coordinates.
+/// Optimized with Source Generators and Normalized Coordinates for resolution independence.
 /// </summary>
-public class CoordinateNeuron : IOcrNeuron<(int K, int X, int Y)>
+public partial class CoordinateNeuron : IOcrNeuron<(int K, int X, int Y)>
 {
-    public ExtractionResult<(int K, int X, int Y)> Process(List<AnalyzedBlock> allBlocks, Dictionary<string, AnalyzedBlock> anchors, List<AnalyzedBlock> blacklist)
+    // High-Performance Compiled Regex
+    [GeneratedRegex(@"#\s*(\d{4,})", RegexOptions.Compiled)]
+    private static partial Regex KingdomRegex();
+
+    [GeneratedRegex(@"X[:;\s]*(\d{1,4})", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
+    private static partial Regex XCoordRegex();
+
+    [GeneratedRegex(@"Y[:;\s]*(\d{1,4})", RegexOptions.Compiled | RegexOptions.IgnoreCase)]
+    private static partial Regex YCoordRegex();
+
+    public ExtractionResult<(int K, int X, int Y)> Process(
+        List<AnalyzedBlock> allBlocks, 
+        Dictionary<string, AnalyzedBlock> anchors, 
+        List<AnalyzedBlock> blacklist)
     {
         int k = 0, x = 0, y = 0;
         AnalyzedBlock? sourceBlock = null;
 
-        // Optimization: Only scan the top 20% of the screen (coordinates are always at the top)
-        // Assuming typical 1080p height, < 300px is safe
+        // Optimization: Scan only the top 20% of the screen (Normalized Y < 0.20).
+        // This ensures it works on 720p, 1080p, 1440p, and 4K images equally well.
         var topBlocks = allBlocks
-            .Where(b => b.Raw.Center.Y < 300) 
+            .Where(b => b.NormalizedCenter.Y < 0.20) 
             .ToList();
 
         foreach (var block in topBlocks)
         {
             string text = block.Raw.Text.ToUpper();
 
-            // Regex for Kingdom Number (e.g., #3746)
-            var kMatch = Regex.Match(text, @"#\s*(\d{4,})");
+            // Extract Kingdom Number (e.g., #3746)
+            var kMatch = KingdomRegex().Match(text);
             if (kMatch.Success)
             {
                 if (int.TryParse(kMatch.Groups[1].Value, out int val)) k = val;
+                // We prefer the block containing the Kingdom ID as the primary source anchor
                 sourceBlock = block;
             }
 
-            // Regex for X Coordinate
-            var xMatch = Regex.Match(text, @"X[:;\s]*(\d{1,4})");
+            // Extract X Coordinate
+            var xMatch = XCoordRegex().Match(text);
             if (xMatch.Success) int.TryParse(xMatch.Groups[1].Value, out x);
 
-            // Regex for Y Coordinate
-            var yMatch = Regex.Match(text, @"Y[:;\s]*(\d{1,4})");
+            // Extract Y Coordinate
+            var yMatch = YCoordRegex().Match(text);
             if (yMatch.Success) int.TryParse(yMatch.Groups[1].Value, out y);
         }
 
-        // We only consider it a success if at least X and Y are found
+        // We require at least valid coordinates to consider it a success.
+        // Kingdom ID might sometimes be obscured by UI, but coords are essential for mapping.
         if (x > 0 && y > 0)
         {
             return new ExtractionResult<(int K, int X, int Y)>
             {
                 Value = (k, x, y),
-                Confidence = 90, // High confidence due to regex match
-                SourceBlock = sourceBlock
+                Confidence = sourceBlock?.Raw.Confidence * 100 ?? 90, 
+                SourceBlock = sourceBlock,
+                Strategy = "Regex_NormalizedHeader"
             };
         }
 
-        return new ExtractionResult<(int K, int X, int Y)> { Value = (0, 0, 0), Confidence = 0 };
+        return new ExtractionResult<(int K, int X, int Y)> 
+        { 
+            Value = (0, 0, 0), 
+            Confidence = 0,
+            Strategy = "NotFound"
+        };
     }
 }

@@ -34,7 +34,7 @@ class YoloDetector:
     def detect_objects(self, image_path: str) -> List[Dict]:
         image = cv2.imread(image_path)
         if image is None:
-            print(f"[YoloDetector] ERRO: Não foi possível ler a imagem {image_path}")
+            print(f"[YoloDetector] ERROR: Could not read image {image_path}")
             return []
         
         input_tensor, ratio, (dw, dh) = self._preprocess(image)
@@ -44,7 +44,7 @@ class YoloDetector:
         # 3. Intelligent Post-processing (v5/v8 and Scale Back)
         detections = self._postprocess(outputs[0], ratio, (dw, dh))
         
-        print(f"[YoloDetector] Imagem processada. Detecções finais: {len(detections)}")
+        print(f"[YoloDetector] Image processed. Final detections: {len(detections)}")
         return detections
 
     def _preprocess(self, image: np.ndarray) -> Tuple[np.ndarray, float, Tuple[float, float]]:

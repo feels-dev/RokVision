@@ -27,7 +27,7 @@ public class WarMagnifier
     public async Task<List<OcrBlock>> RescanBatchAsync(
         string imagePath, 
         List<AnalyzedBlock> nodesToRepair, 
-        OcrAnalysisContext context) // Contexto injetado
+        OcrAnalysisContext context)
     {
         if (nodesToRepair == null || !nodesToRepair.Any()) 
             return new List<OcrBlock>();
@@ -38,7 +38,6 @@ public class WarMagnifier
 
         foreach (var node in nodesToRepair)
         {
-            // Box structure: [[x1,y1], [x2,y1], [x2,y2], [x1,y2]]
             int x = (int)node.Raw.Box[0][0];
             int y = (int)node.Raw.Box[0][1];
             int w = (int)(node.Raw.Box[2][0] - node.Raw.Box[0][0]);
@@ -56,17 +55,15 @@ public class WarMagnifier
             }
         }
 
-        // 2. ONE CALL TO RULE THEM ALL
-        context.Log($"[WarMagnifier] Sending Batch Request: {batchRequests.Count} sub-tasks for {nodesToRepair.Count} nodes.");
+        context.Log("WarMagnifier", $"Sending Batch Request: {batchRequests.Count} sub-tasks for {nodesToRepair.Count} nodes.");
         
         var results = await _ocrService.AnalyzeBatchAsync(imagePath, batchRequests);
 
-        // 3. Filter Results
         var validResults = results
             .Where(r => r.Confidence > 0.60)
             .ToList();
 
-        context.Log($"[WarMagnifier] Batch finished. Received {validResults.Count} valid candidates.");
+        context.Log("WarMagnifier", $"Batch finished. Received {validResults.Count} valid candidates.");
 
         return validResults;
     }

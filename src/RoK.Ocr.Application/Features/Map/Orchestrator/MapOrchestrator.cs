@@ -16,7 +16,7 @@ using SixLabors.ImageSharp;
 namespace RoK.Ocr.Application.Features.Map.Orchestrator;
 
 /// <summary>
-/// Map Orchestrator v6.0 (Clean Architecture Compliant)
+/// Map Orchestrator v6.0 (Enterprise Architecture Compliant)
 /// Orchestrates the flow between Image Services, AI Detection, and OCR Neurons.
 /// </summary>
 public class MapOrchestrator
@@ -54,7 +54,11 @@ public class MapOrchestrator
             {
                 imgWidth = imgInfo.Width;
                 imgHeight = imgInfo.Height;
-                context.DebugInfo.Image = new ImageMetaDto { Path = mainImagePath, Width = imgWidth, Height = imgHeight };
+
+                // Set Image Context for Normalized Coordinates
+                context.ImageWidth = imgWidth;
+                context.ImageHeight = imgHeight;
+                context.DebugInfo.ImagePath = mainImagePath;
             }
 
             // 2. YOLO DETECTION
@@ -64,17 +68,21 @@ public class MapOrchestrator
             var cityLabels = allDetections.Where(d => d.ClassName == "city_label").ToList();
             var shields = allDetections.Where(d => d.ClassName == "shield").ToList();
 
-            context.Log($"[YOLO] Found {cityLabels.Count} city labels and {shields.Count} shields.");
+            context.Log("YoloDetector", $"Found {cityLabels.Count} city labels and {shields.Count} shields.");
+            context.DebugInfo.YoloMetrics["TotalDetections"] = allDetections.Count;
+            context.DebugInfo.YoloMetrics["CityLabels"] = cityLabels.Count;
+            context.DebugInfo.YoloMetrics["Shields"] = shields.Count;
+
             context.StopTimer("YOLO_Detection");
 
             // 3. GLOBAL OCR (Coordinates & Anchors)
             context.StartTimer("OCR_Coordinates");
             var (rawBlocks, fullText) = await _ocrService.AnalyzeImageAsync(mainImagePath);
-            
+
             // Assign Global Text purely to Debug RawText
             context.DebugInfo.RawText = fullText;
 
-            var analyzedBlocks = rawBlocks.Select(b => new AnalyzedBlock { Raw = b }).ToList();
+            var analyzedBlocks = rawBlocks.Select(b => new AnalyzedBlock { Raw = b, CanvasWidth = imgWidth, CanvasHeight = imgHeight }).ToList();
             var coordResult = _coordNeuron.Process(analyzedBlocks, new(), new());
 
             if (coordResult.Confidence > 0)
@@ -83,13 +91,15 @@ public class MapOrchestrator
                 result.X = coordResult.Value.X;
                 result.Y = coordResult.Value.Y;
 
-                RegisterEvidence(context, "coordinates", $"(K:{result.KingdomNumber} X:{result.X} Y:{result.Y})",
-                    coordResult.SourceBlock?.Raw.Text ?? "", coordResult.Confidence, "CoordinateNeuron", ExtractBox(coordResult.SourceBlock));
+                // Register Coordinates Evidence
+                context.RegisterResult("coordinates_k", CreateResult(result.KingdomNumber, coordResult.Confidence, coordResult.SourceBlock, coordResult.Strategy), "CoordinateNeuron");
+                context.RegisterResult("coordinates_x", CreateResult(result.X, coordResult.Confidence, coordResult.SourceBlock, coordResult.Strategy), "CoordinateNeuron");
+                context.RegisterResult("coordinates_y", CreateResult(result.Y, coordResult.Confidence, coordResult.SourceBlock, coordResult.Strategy), "CoordinateNeuron");
             }
-            
+
             // POPULATE ANCHORS: Scan for UI elements to fill 'anchorsFound' in Debug JSON
             ExtractAndRegisterAnchors(analyzedBlocks, context);
-            
+
             context.StopTimer("OCR_Coordinates");
 
             // 4. CANDIDATE GENERATION
@@ -106,6 +116,22 @@ public class MapOrchestrator
                 var nearbyShield = shields.FirstOrDefault(s => IsShieldAbove(s, labelCx, labelCy, label.Box[2]));
                 if (nearbyShield != null) usedShields.Add(nearbyShield);
 
+                // Register UI Interactable for Automation (Clicking on the city label)
+                var interactableBlock = new AnalyzedBlock
+                {
+                    Raw = new OcrBlock
+                    {
+                        Box = new List<List<double>>
+                        {
+                            new() { label.Box[0], label.Box[1] },
+                            new() { label.Box[0] + label.Box[2], label.Box[1] },
+                            new() { label.Box[0] + label.Box[2], label.Box[1] + label.Box[3] },
+                            new() { label.Box[0], label.Box[1] + label.Box[3] }
+                        }
+                    }
+                };
+                context.RegisterInteractable($"city_label_{candidates.Count}", label.Confidence * 100, "YOLO_Map_Model", interactableBlock);
+
                 candidates.Add(new OcrRegionCandidate
                 {
                     Id = Guid.NewGuid().ToString(),
@@ -114,7 +140,7 @@ public class MapOrchestrator
                     CenterX = labelCx,
                     CenterY = labelCy,
                     Source = "YOLO_Label",
-                    Strategy = "MapLabel" 
+                    Strategy = "MapLabel"
                 });
 
                 MarkAreaAsCovered(label.Box.ToArray(), coveredAreas);
@@ -124,18 +150,18 @@ public class MapOrchestrator
             var textCandidates = _magnifier.FindTextBasedCandidates(analyzedBlocks, imgWidth, imgHeight, coveredAreas);
             if (textCandidates.Any())
             {
-                context.Log($"[Fallback] Found {textCandidates.Count} potential cities via Text Analysis.");
-                foreach (var c in textCandidates) 
+                context.Log("MapMagnifier", $"[Fallback] Found {textCandidates.Count} potential cities via Text Analysis.");
+                foreach (var c in textCandidates)
                 {
                     c.Id = Guid.NewGuid().ToString();
-                    c.Strategy = "MapLabel";
+                    c.Strategy = "MapLabel_TextHeuristic";
                 }
                 candidates.AddRange(textCandidates);
             }
 
             if (!candidates.Any())
             {
-                context.LogWarning("WARN_NO_CITIES", "No cities detected via YOLO or Text Analysis.");
+                context.LogWarning("CityNeuron", "WARN_NO_CITIES", "No cities detected via YOLO or Text Analysis.", "MEDIUM");
                 return (result, context);
             }
 
@@ -146,7 +172,6 @@ public class MapOrchestrator
             context.StopTimer("OCR_BatchCities");
 
             // --- CLEAN RAW TEXT CONCATENATION ---
-            // Append Batch results exclusively to the Debug RawText property, keeping AuditLog clean.
             if (context.DebugInfo != null && batchResults.Any())
             {
                 context.DebugInfo.RawText += "\n\n--- BATCH OCR CROPS ---";
@@ -154,13 +179,11 @@ public class MapOrchestrator
                 {
                     if (!string.IsNullOrWhiteSpace(batchRes.Text))
                     {
-                        // Use the last 6 characters of the ID to keep the log readable
                         string shortId = batchRes.CustomId.Length >= 6 ? batchRes.CustomId.Substring(batchRes.CustomId.Length - 6) : batchRes.CustomId;
                         context.DebugInfo.RawText += $"\n[Crop_{shortId}] {batchRes.Text}";
                     }
                 }
             }
-            // ------------------------------------
 
             // 6. FINAL PARSING & NEURON VALIDATION
             context.StartTimer("CityParsing");
@@ -169,54 +192,44 @@ public class MapOrchestrator
             foreach (var candidate in candidates)
             {
                 string shortId = candidate.Id.Length >= 6 ? candidate.Id.Substring(candidate.Id.Length - 6) : candidate.Id;
-                context.Log($"--- Evaluating Candidate [{shortId}] ({candidate.Source}) ---");
 
                 var ocrResult = batchResults.FirstOrDefault(b => b.CustomId == candidate.Id);
                 string textToParse = ocrResult?.Text ?? "";
 
-                if (string.IsNullOrWhiteSpace(textToParse))
+                if (string.IsNullOrWhiteSpace(textToParse)) continue;
+
+                var parseResult = _cityNeuron.Parse(textToParse, candidate.HasShield);
+
+                if (!parseResult.IsValid)
                 {
-                    context.Log($"  -> Rejected: Empty text extraction.");
+                    context.Log("CityNeuron", $"Rejected candidate [{shortId}]. Reason: {parseResult.RejectReason}");
                     continue;
                 }
 
-                // NOTE: Raw OCR Text is no longer logged here. It is safely stored in Debug.RawText.
-
-                var (name, tag, rejectReason) = _cityNeuron.Parse(textToParse, candidate.HasShield);
-
-                if (name == "--INVALID--")
-                {
-                    context.Log($"  -> Rejected by CityNeuron. Reason: {rejectReason}");
-                    continue;
-                }
-
+                string name = parseResult.Name;
+                string tag = parseResult.AllianceTag;
                 bool missingTag = string.IsNullOrEmpty(tag);
+                bool magnifierSuccess = false; // Flag de rastreio de correção
 
                 if (missingTag)
                 {
-                    context.Log($"  -> Missing Alliance Tag. Triggering Magnifier Zoom...");
-                    
+                    context.Log("MapMagnifier", $"Candidate [{shortId}] missing tag. Triggering Zoom...");
+
                     var refinedText = await _magnifier.ZoomOnLabel(mainImagePath, candidate.Box, context);
-                    bool magnifierSuccess = false;
 
                     if (!string.IsNullOrWhiteSpace(refinedText))
                     {
                         var reParsed = _cityNeuron.Parse(refinedText, candidate.HasShield);
 
-                        if (reParsed.Name != "--INVALID--" && !string.IsNullOrEmpty(reParsed.AllianceTag))
+                        if (reParsed.IsValid && !string.IsNullOrEmpty(reParsed.AllianceTag))
                         {
-                            context.Log($"  -> Magnifier Success! Rescued tag.");
+                            context.Log("MapMagnifier", $"Success! Rescued tag for [{shortId}].");
                             name = reParsed.Name;
                             tag = reParsed.AllianceTag;
                             textToParse = refinedText;
-                            magnifierSuccess = true;
-                            
-                            // Also append Magnifier text to RawText for complete transparency
+                            magnifierSuccess = true; // SUCESSO DO AUTO-FIX!
+
                             context.DebugInfo.RawText += $"\n[Magnifier_{shortId}] {refinedText}";
-                        }
-                        else
-                        {
-                            context.Log($"  -> Magnifier executed, but tag is still missing or invalid.");
                         }
                     }
 
@@ -233,22 +246,60 @@ public class MapOrchestrator
 
                 result.Cities.Add(city);
 
-                RegisterCityEvidence(context, city, textToParse, ocrResult?.Confidence ?? 0.8, candidate, cityIndex);
-                cityIndex++;
+                // Reconstruct a dummy block for spatial registration
+                var dummyBlock = new AnalyzedBlock
+                {
+                    Raw = new OcrBlock
+                    {
+                        Text = textToParse,
+                        Confidence = ocrResult?.Confidence ?? 0.8,
+                        Box = new List<List<double>>
+                        {
+                            new() { candidate.Box[0], candidate.Box[1] },
+                            new() { candidate.Box[0] + candidate.Box[2], candidate.Box[1] },
+                            new() { candidate.Box[0] + candidate.Box[2], candidate.Box[1] + candidate.Box[3] },
+                            new() { candidate.Box[0], candidate.Box[1] + candidate.Box[3] }
+                        }
+                    }
+                };
 
-                context.Log($"  -> SUCCESS: Added City [{city.AllianceTag}] {city.Name} | Shield: {city.HasShield}");
+                string p = $"city_{cityIndex}";
+
+                context.RegisterResult(
+                    $"{p}_name",
+                    CreateResult(city.Name, dummyBlock.Raw.Confidence * 100, dummyBlock, candidate.Strategy),
+                    $"CityNeuron_{candidate.Source}",
+                    "PaddleOCR_v4",
+                    magnifierSuccess
+                );
+
+                context.RegisterResult(
+                    $"{p}_tag",
+                    CreateResult(city.AllianceTag, dummyBlock.Raw.Confidence * 100, dummyBlock, candidate.Strategy),
+                    $"CityNeuron_{candidate.Source}",
+                    "PaddleOCR_v4",
+                    magnifierSuccess
+                );
+
+                context.RegisterResult(
+                    $"{p}_shield",
+                    CreateResult(city.HasShield ? "Yes" : "No", 100, dummyBlock, "Yolo_Detection"),
+                    "Yolo_Map_Model"
+                );
+
+                cityIndex++;
             }
-            
+
             if (candidates.Count > 0 && result.Cities.Count == 0)
             {
-                 context.LogWarning("WARN_ALL_CANDIDATES_REJECTED", "Candidates found, but CityNeuron rejected all of them. Check audit logs.");
+                context.LogWarning("CityNeuron", "WARN_ALL_CANDIDATES_REJECTED", "Candidates found, but CityNeuron rejected all of them. Check debug logs.", "HIGH");
             }
 
             context.StopTimer("CityParsing");
         }
         catch (Exception ex)
         {
-            context.LogError($"Critical Error in MapOrchestrator: {ex.Message}");
+            context.LogError("MapOrchestrator", $"Critical Error: {ex.Message}");
         }
         finally
         {
@@ -265,10 +316,6 @@ public class MapOrchestrator
     // HELPERS
     // =================================================================================
 
-    /// <summary>
-    /// Scans the globally extracted text blocks for known UI elements and registers them as Anchors.
-    /// This populates the 'anchorsFound' array in the Debug JSON.
-    /// </summary>
     private void ExtractAndRegisterAnchors(List<AnalyzedBlock> blocks, OcrAnalysisContext context)
     {
         var foundAnchors = new HashSet<string>();
@@ -277,21 +324,11 @@ public class MapOrchestrator
         foreach (var block in blocks)
         {
             string text = block.Raw.Text.Trim();
-            // Check if the text matches any known UI keyword (case-insensitive)
             var matchedKeyword = uiKeywords.FirstOrDefault(kw => text.Contains(kw, StringComparison.OrdinalIgnoreCase));
-            
-            if (matchedKeyword != null)
-            {
-                foundAnchors.Add(matchedKeyword);
-            }
-            else if (text.Contains("UTC", StringComparison.OrdinalIgnoreCase))
-            {
-                foundAnchors.Add("UTC");
-            }
-            else if (text.Contains("VIP", StringComparison.OrdinalIgnoreCase))
-            {
-                foundAnchors.Add("VIP");
-            }
+
+            if (matchedKeyword != null) foundAnchors.Add(matchedKeyword);
+            else if (text.Contains("UTC", StringComparison.OrdinalIgnoreCase)) foundAnchors.Add("UTC");
+            else if (text.Contains("VIP", StringComparison.OrdinalIgnoreCase)) foundAnchors.Add("VIP");
         }
 
         context.RegisterAnchors(foundAnchors);
@@ -316,26 +353,8 @@ public class MapOrchestrator
     private int[] ExpandBox(int[] b, int l, int t, int r, int d)
         => new int[] { Math.Max(0, b[0] - l), Math.Max(0, b[1] - t), b[2] + l + r, b[3] + t + d };
 
-    private List<int>? ExtractBox(AnalyzedBlock? block)
+    private ExtractionResult<T> CreateResult<T>(T val, double conf, AnalyzedBlock? block, string strategy)
     {
-        if (block == null) return null;
-        var r = block.Raw.Box;
-        return new List<int> { (int)r[0][0], (int)r[0][1], (int)(r[1][0] - r[0][0]), (int)(r[2][1] - r[1][1]) };
-    }
-
-    private void RegisterEvidence(OcrAnalysisContext ctx, string key, object value, string raw, double conf, string method, List<int>? box)
-    {
-        ctx.Evidence[key] = new FieldEvidenceDto { Value = value, Raw = raw, Confidence = Math.Round(conf, 2), Method = method, Box = box };
-    }
-
-    private void RegisterCityEvidence(OcrAnalysisContext ctx, MapCity city, string raw, double conf, OcrRegionCandidate cand, int idx)
-    {
-        string p = $"city_{idx}";
-        var b = new List<int> { cand.Box[0], cand.Box[1], cand.Box[2], cand.Box[3] };
-        double c = Math.Round(conf * 100, 2);
-
-        RegisterEvidence(ctx, $"{p}_name", city.Name, raw, c, $"CityNeuron_{cand.Source}", b);
-        RegisterEvidence(ctx, $"{p}_tag", city.AllianceTag, raw, c, $"CityNeuron_{cand.Source}", b);
-        RegisterEvidence(ctx, $"{p}_shield", city.HasShield, city.HasShield ? "Yes" : "No", 100, "Yolo_Or_Heuristic", b);
+        return new ExtractionResult<T> { Value = val, Confidence = conf, SourceBlock = block, Strategy = strategy };
     }
 }

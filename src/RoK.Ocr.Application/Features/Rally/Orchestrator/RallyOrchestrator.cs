@@ -206,7 +206,7 @@ public class RallyOrchestrator
                     }
 
                     context.StartTimer($"Image_{i}_Merge");
-                    if (participants.Any()) await _magnifier.EnrichTroopDetailsAsync(path, participants, analyzedBlocks);
+                    if (participants.Any()) await _magnifier.EnrichTroopDetailsAsync(path, participants, analyzedBlocks, context);
 
                     foreach (var p in participants)
                     {
@@ -238,22 +238,20 @@ public class RallyOrchestrator
             // Pass global blocks for accurate confidence calculation
             AuditRally(result, context, globalUsedBlocks);
 
-            // 4. REGISTER RESULTS WITH REAL CONFIDENCE
-            // We use the helper method FindConfidence to retrieve the exact OCR confidence from the used blocks
+            // 4. REGISTER RESULTS WITH REAL CONFIDENCE AND SPATIAL TRACEABILITY
+            var targetEv = FindBlockEvidence(result.Target.Name, globalUsedBlocks);
+            var leaderEv = FindBlockEvidence(result.Leader.Name, globalUsedBlocks);
+            var capEv = FindBlockEvidence(result.Status.CurrentCapacity.ToString(), globalUsedBlocks);
 
-            var idConf = 100.0; // Synthetic ID, always 100
+            // Rally ID doesn't have a spatial block (it's generated), so null is acceptable here.
+            context.RegisterResult("rally_id", CreateResult(result.RallyId, "String_Concat", 100.0, null), "RallyOrchestrator");
 
-            var targetConf = FindBlockConfidence(result.Target.Name, globalUsedBlocks);
-            var leaderConf = FindBlockConfidence(result.Leader.Name, globalUsedBlocks);
-            var capConf = FindBlockConfidence(result.Status.CurrentCapacity.ToString(), globalUsedBlocks);
+            // Registering with SourceBlock ensures the API outputs the 'spatial' coordinates
+            context.RegisterResult("target_name", CreateResult(result.Target.Name, result.Target.IsNpc ? "Target_NpcRules" : "Target_PvPRules", targetEv.Confidence, targetEv.SourceBlock), "RallyTargetNeuron");
 
-            context.RegisterResult("rally_id", CreateResult(result.RallyId, "String_Concat", idConf), "RallyOrchestrator");
+            context.RegisterResult("leader_name", CreateResult(result.Leader.Name, "Header_TagRegex", leaderEv.Confidence, leaderEv.SourceBlock), "RallyHeaderNeuron");
 
-            context.RegisterResult("target_name", CreateResult(result.Target.Name, result.Target.IsNpc ? "Target_NpcRules" : "Target_PvPRules", targetConf), "RallyTargetNeuron");
-
-            context.RegisterResult("leader_name", CreateResult(result.Leader.Name, "Header_TagRegex", leaderConf), "RallyHeaderNeuron");
-
-            context.RegisterResult("current_capacity", CreateResult(result.Status.CurrentCapacity, "Header_CapacityRegex", capConf), "RallyHeaderNeuron");
+            context.RegisterResult("current_capacity", CreateResult(result.Status.CurrentCapacity, "Header_CapacityRegex", capEv.Confidence, capEv.SourceBlock), "RallyHeaderNeuron");
         }
         catch (Exception ex)
         {
@@ -266,6 +264,49 @@ public class RallyOrchestrator
         }
 
         return (result, context);
+    }
+
+    /// <summary>
+    /// Lookups both the real OCR confidence and the original spatial block that provided the text.
+    /// Uses Fuzzy matching to handle slight cleanup changes.
+    /// </summary>
+    private (double Confidence, AnalyzedBlock? SourceBlock) FindBlockEvidence(string value, HashSet<AnalyzedBlock> blocks)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return (0, null);
+
+        var exact = blocks.FirstOrDefault(b => b.Raw.Text.Contains(value));
+        if (exact != null) return (exact.Raw.Confidence * 100, exact);
+
+
+        var bestFuzzy = blocks
+            .Select(b => new { Block = b, Ratio = Fuzz.PartialRatio(b.Raw.Text, value) })
+            .Where(x => x.Ratio > 85)
+            .OrderByDescending(x => x.Ratio)
+            .FirstOrDefault();
+
+        if (bestFuzzy != null) return (bestFuzzy.Block.Raw.Confidence * 100, bestFuzzy.Block);
+
+        if (long.TryParse(value, out _))
+        {
+            var numberMatch = blocks
+                .Select(b => new { Block = b, CleanText = Regex.Replace(b.Raw.Text, @"[^\d]", "") })
+                .Where(x => x.CleanText.Contains(value)) // Procura "206000" dentro de "2060002200000"
+                .OrderByDescending(x => x.Block.Raw.Confidence)
+                .FirstOrDefault();
+
+            if (numberMatch != null) return (numberMatch.Block.Raw.Confidence * 100, numberMatch.Block);
+        }
+
+        if (value == "Barbarian Fort")
+        {
+            var fortMatch = blocks
+                .Where(b => b.Raw.Text.Contains("Forte") || b.Raw.Text.Contains("Fort"))
+                .OrderByDescending(b => b.Raw.Confidence)
+                .FirstOrDefault();
+            if (fortMatch != null) return (fortMatch.Raw.Confidence * 100, fortMatch);
+        }
+
+        return (50.0, null);
     }
 
     private void InferTroopTypes(RallyResult result, OcrAnalysisContext context)
@@ -313,14 +354,14 @@ public class RallyOrchestrator
     }
 
     /// <summary>
-    /// Helper to create a Result with dynamic confidence.
+    /// Helper to create a Result with dynamic confidence and spatial traceability.
     /// </summary>
-    private ExtractionResult<T> CreateResult<T>(T val, string strategy, double confidence) => new ExtractionResult<T>
+    private ExtractionResult<T> CreateResult<T>(T val, string strategy, double confidence, AnalyzedBlock? sourceBlock) => new ExtractionResult<T>
     {
         Value = val,
         Confidence = Math.Clamp(confidence, 0, 100),
         Strategy = strategy,
-        SourceBlock = null
+        SourceBlock = sourceBlock
     };
 
     /// <summary>

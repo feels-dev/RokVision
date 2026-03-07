@@ -25,9 +25,12 @@ public class RallyTroopMagnifier
     /// Locates troop numbers in each participant's row, crops the adjacent left icon, 
     /// and identifies the tier color to populate the participant's troop details list.
     /// </summary>
-    public async Task EnrichTroopDetailsAsync(string imagePath, List<RallyParticipant> participants, List<AnalyzedBlock> allBlocks)
+    public async Task EnrichTroopDetailsAsync(string imagePath, List<RallyParticipant> participants, List<AnalyzedBlock> allBlocks, OcrAnalysisContext context)
     {
         if (!allBlocks.Any()) return;
+
+        context.StartTimer("Magnifier_EnrichTroops");
+        context.Log("RallyTroopMagnifier", "Starting troop color/tier enrichment via Batch OCR...");
 
         int imgW = (int)allBlocks.First().CanvasWidth;
         int imgH = (int)allBlocks.First().CanvasHeight;
@@ -111,7 +114,14 @@ public class RallyTroopMagnifier
             }
         }
 
-        if (cropsRequest.Count == 0) return;
+        if (cropsRequest.Count == 0)
+        {
+            context.StopTimer("Magnifier_EnrichTroops");
+            return;
+        }
+
+        context.Log("RallyTroopMagnifier", $"Queued {cropsRequest.Count} crops for Troop Tier Color detection.");
+
         var results = await _ocrService.AnalyzeBatchAsync(imagePath, cropsRequest);
 
         foreach (var res in results)
@@ -130,6 +140,10 @@ public class RallyTroopMagnifier
                 }
             }
         }
+
+        context.ExecutionTrace.MagnifierUsed = true;
+        context.StopTimer("Magnifier_EnrichTroops");
+        context.Log("RallyTroopMagnifier", "Troop color enrichment completed successfully.");
     }
 
     /// <summary>

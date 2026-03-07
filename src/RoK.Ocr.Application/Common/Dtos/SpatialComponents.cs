@@ -2,84 +2,82 @@ using System.Text.Json.Serialization;
 
 namespace RoK.Ocr.Application.Common.Dtos;
 
-/// <summary>
-/// Represents a 2D point in the image, usually the exact click target for automation bots.
-/// </summary>
-public class PointDto
-{[JsonPropertyName("x")]
-    public int? X { get; set; }
-
-    [JsonPropertyName("y")]
-    public int? Y { get; set; }
-
-    [JsonPropertyName("nx")]
-    public double? NormalizedX { get; set; }
-
-    [JsonPropertyName("ny")]
-    public double? NormalizedY { get; set; }
-}
-
-/// <summary>
-/// Represents a bounding box in the image.
-/// </summary>
-public class BoundingBoxDto
+// DTOs for Absolute (Pixel) Coordinates
+public class AbsolutePointDto
 {
     [JsonPropertyName("x")]
-    public int? X { get; set; }
+    public int X { get; set; }
 
     [JsonPropertyName("y")]
-    public int? Y { get; set; }
-
-    [JsonPropertyName("w")]
-    public int? Width { get; set; }
-
-    [JsonPropertyName("h")]
-    public int? Height { get; set; }[JsonPropertyName("nx")]
-    public double? NormalizedX { get; set; }
-
-    [JsonPropertyName("ny")]
-    public double? NormalizedY { get; set; }
-
-    [JsonPropertyName("nw")]
-    public double? NormalizedWidth { get; set; }
-
-    [JsonPropertyName("nh")]
-    public double? NormalizedHeight { get; set; }
+    public int Y { get; set; }
 }
 
-/// <summary>
-/// Contains absolute pixel coordinates. Highly dependent on the original image resolution.
-/// </summary>
+public class AbsoluteBoundingBoxDto
+{
+    [JsonPropertyName("x")]
+    public int X { get; set; }
+
+    [JsonPropertyName("y")]
+    public int Y { get; set; }
+
+    [JsonPropertyName("w")]
+    public int Width { get; set; }
+
+    [JsonPropertyName("h")]
+    public int Height { get; set; }
+}
+
 public class AbsoluteSpatialDto
 {
     [JsonPropertyName("box")]
-    public BoundingBoxDto Box { get; set; } = new();
+    public AbsoluteBoundingBoxDto? Box { get; set; }
 
     [JsonPropertyName("center")]
-    public PointDto Center { get; set; } = new();
+    public AbsolutePointDto? Center { get; set; }
 }
 
-/// <summary>
-/// Contains normalized coordinates (0.0 to 1.0). 
-/// Resolution independent, highly recommended for building robust automation bots.
-/// </summary>
+// DTOs for Normalized (0.0 to 1.0) Coordinates
+public class NormalizedPointDto
+{
+    [JsonPropertyName("nx")]
+    public double NormalizedX { get; set; }
+
+    [JsonPropertyName("ny")]
+    public double NormalizedY { get; set; }
+}
+
+public class NormalizedBoundingBoxDto
+{
+    [JsonPropertyName("nx")]
+    public double NormalizedX { get; set; }
+
+    [JsonPropertyName("ny")]
+    public double NormalizedY { get; set; }
+
+    [JsonPropertyName("nw")]
+    public double NormalizedWidth { get; set; }
+
+    [JsonPropertyName("nh")]
+    public double NormalizedHeight { get; set; }
+}
+
 public class NormalizedSpatialDto
 {
     [JsonPropertyName("box")]
-    public BoundingBoxDto Box { get; set; } = new();
+    public NormalizedBoundingBoxDto? Box { get; set; }
 
     [JsonPropertyName("center")]
-    public PointDto Center { get; set; } = new();
+    public NormalizedPointDto? Center { get; set; }
 }
 
-/// <summary>
-/// The complete spatial context for any detected element, combining both absolute and normalized metrics.
-/// </summary>
+// The complete spatial context
 public class SpatialContextDto
 {
     [JsonPropertyName("absolute")]
-    public AbsoluteSpatialDto Absolute { get; set; } = new();
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AbsoluteSpatialDto? Absolute { get; set; }
 
     [JsonPropertyName("normalized")]
-    public NormalizedSpatialDto Normalized { get; set; } = new();
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public NormalizedSpatialDto? Normalized { get; set; }
 }

@@ -45,7 +45,7 @@ public class OcrAnalysisContext
                 DebugInfo.Timings[key] += sw.Elapsed.TotalMilliseconds;
             else
                 DebugInfo.Timings[key] = sw.Elapsed.TotalMilliseconds;
-            
+
             _activeTimers.Remove(key);
         }
     }
@@ -63,13 +63,13 @@ public class OcrAnalysisContext
     }
 
     public void Log(string component, string message) => AddTrace("INFO", component, message);
-    
+
     public void LogWarning(string component, string code, string message, string severity = "MEDIUM", string? field = null)
     {
         AddTrace("WARN", component, $"{code}: {message}");
         Warnings.Add(new SystemWarning(code, message, severity, field));
     }
-    
+
     public void LogError(string component, string message) => AddTrace("ERROR", component, message);
 
     // --- RESULT REGISTRATION METHODS ---
@@ -123,23 +123,28 @@ public class OcrAnalysisContext
             int w = (int)(rawBox[1][0] - rawBox[0][0]);
             int h = (int)(rawBox[2][1] - rawBox[1][1]);
 
-            spatial.Absolute.Box = new BoundingBoxDto { X = x, Y = y, Width = w, Height = h };
-            spatial.Absolute.Center = new PointDto { X = x + (w / 2), Y = y + (h / 2) };
+            spatial.Absolute = new AbsoluteSpatialDto
+            {
+                Box = new AbsoluteBoundingBoxDto { X = x, Y = y, Width = w, Height = h },
+                Center = new AbsolutePointDto { X = x + (w / 2), Y = y + (h / 2) }
+            };
 
-            // Calculate normalized coordinates if image dimensions are provided
             if (ImageWidth > 0 && ImageHeight > 0)
             {
-                spatial.Normalized.Box = new BoundingBoxDto
+                spatial.Normalized = new NormalizedSpatialDto
                 {
-                    NormalizedX = Math.Round((double)x / ImageWidth, 4),
-                    NormalizedY = Math.Round((double)y / ImageHeight, 4),
-                    NormalizedWidth = Math.Round((double)w / ImageWidth, 4),
-                    NormalizedHeight = Math.Round((double)h / ImageHeight, 4)
-                };
-                spatial.Normalized.Center = new PointDto
-                {
-                    NormalizedX = Math.Round((double)spatial.Absolute.Center.X / ImageWidth, 4),
-                    NormalizedY = Math.Round((double)spatial.Absolute.Center.Y / ImageHeight, 4)
+                    Box = new NormalizedBoundingBoxDto
+                    {
+                        NormalizedX = Math.Round((double)x / ImageWidth, 4),
+                        NormalizedY = Math.Round((double)y / ImageHeight, 4),
+                        NormalizedWidth = Math.Round((double)w / ImageWidth, 4),
+                        NormalizedHeight = Math.Round((double)h / ImageHeight, 4)
+                    },
+                    Center = new NormalizedPointDto
+                    {
+                        NormalizedX = Math.Round((double)spatial.Absolute.Center.X / ImageWidth, 4),
+                        NormalizedY = Math.Round((double)spatial.Absolute.Center.Y / ImageHeight, 4)
+                    }
                 };
             }
         }
@@ -151,8 +156,8 @@ public class OcrAnalysisContext
     public double GetTotalProcessingTimeMs()
     {
         if (DebugInfo.Timings.TryGetValue("TotalOrchestration", out double val))
-            return val; 
-            
+            return val;
+
         return (DateTime.UtcNow - StartTime).TotalMilliseconds;
     }
 
